@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import { GlassesCamera, pickPrimaryFace } from "../components/GlassesCamera";
+import { GlassesCamera, pickCenterFace } from "../components/GlassesCamera";
 import { getBackendParam } from "../config/runtime";
 import { useRecognizeWebSocket } from "../hooks/useWebSocket";
 import "./GlassesPage.css";
@@ -8,9 +8,13 @@ import "./GlassesPage.css";
 export function GlassesPage() {
   const [fps, setFps] = useState(8);
   const [gpuMode, setGpuMode] = useState(false);
+  const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
   const { connected, faces, inferenceMs, error, sendFrame } = useRecognizeWebSocket(true);
 
-  const primary = useMemo(() => pickPrimaryFace(faces), [faces]);
+  const primary = useMemo(
+    () => pickCenterFace(faces, frameSize.width, frameSize.height),
+    [faces, frameSize.width, frameSize.height],
+  );
   const isKnown = primary != null && primary.name !== "未知";
 
   useEffect(() => {
@@ -64,25 +68,26 @@ export function GlassesPage() {
       <GlassesCamera
         faces={faces}
         onFrame={sendFrame}
+        onFrameSize={(width, height) => setFrameSize({ width, height })}
         fps={fps}
         captureMaxWidth={640}
         captureQuality={0.6}
       />
 
-      <div className="glasses-page__name-panel">
+      <div className="glasses-page__center-hud" aria-live="polite">
         {primary ? (
           <>
-            <div className={`glasses-page__name ${isKnown ? "" : "glasses-page__name--unknown"}`}>
+            <div className={`glasses-page__center-name ${isKnown ? "" : "glasses-page__center-name--unknown"}`}>
               {isKnown ? primary.name : "未知"}
             </div>
-            <div className={`glasses-page__sub ${isKnown ? "" : "glasses-page__sub--unknown"}`}>
+            <div className={`glasses-page__center-sub ${isKnown ? "" : "glasses-page__center-sub--unknown"}`}>
               {isKnown
-                ? `置信度 ${(primary.confidence * 100).toFixed(0)}%`
-                : "未录入人脸"}
+                ? `${(primary.confidence * 100).toFixed(0)}%`
+                : "未录入"}
             </div>
           </>
         ) : (
-          <div className="glasses-page__idle">注视学生面部</div>
+          <div className="glasses-page__center-idle">注视画面中心</div>
         )}
       </div>
 

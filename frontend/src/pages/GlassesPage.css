@@ -130,47 +130,70 @@
   cursor: pointer;
 }
 
-.glasses-page__name-panel {
+.glasses-page__center-hud {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  inset: 0;
   z-index: 10;
-  padding: 24px 20px 32px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 60%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
   text-align: center;
   pointer-events: none;
 }
 
-.glasses-page__name {
-  font-size: clamp(2.5rem, 12vw, 4.5rem);
+.glasses-page__center-hud::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 72px;
+  height: 72px;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(57, 255, 20, 0.35);
+  border-radius: 50%;
+  box-shadow: 0 0 24px rgba(57, 255, 20, 0.15);
+}
+
+.glasses-page__center-name {
+  position: relative;
+  font-size: clamp(2.75rem, 14vw, 5rem);
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.05;
   color: #39ff14;
-  text-shadow: 0 0 20px rgba(57, 255, 20, 0.6);
+  text-shadow:
+    0 0 24px rgba(57, 255, 20, 0.75),
+    0 2px 8px rgba(0, 0, 0, 0.9);
   letter-spacing: 0.08em;
 }
 
-.glasses-page__name--unknown {
+.glasses-page__center-name--unknown {
   color: #ff6666;
-  text-shadow: 0 0 16px rgba(255, 68, 68, 0.5);
+  text-shadow:
+    0 0 20px rgba(255, 68, 68, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.9);
 }
 
-.glasses-page__sub {
-  margin-top: 8px;
-  font-size: clamp(1rem, 4vw, 1.25rem);
-  opacity: 0.85;
+.glasses-page__center-sub {
+  position: relative;
+  margin-top: 10px;
+  font-size: clamp(1rem, 4vw, 1.35rem);
+  opacity: 0.9;
   color: #a8ffb0;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
 }
 
-.glasses-page__sub--unknown {
+.glasses-page__center-sub--unknown {
   color: #ffaaaa;
 }
 
-.glasses-page__idle {
-  font-size: 1.25rem;
-  opacity: 0.5;
+.glasses-page__center-idle {
+  position: relative;
+  font-size: clamp(1.1rem, 4vw, 1.4rem);
+  opacity: 0.55;
   color: #888;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
 }
 
 .glasses-page__hint {
