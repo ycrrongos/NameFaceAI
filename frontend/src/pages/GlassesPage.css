@@ -9,6 +9,31 @@
   -webkit-user-select: none;
 }
 
+/* Rokid：不做 CSS 旋转（系统会统一旋转 WebView 与透视层；再 rotate 会导致框偏 90°） */
+.glasses-page--rokid {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+html.rokid-webview,
+html.rokid-webview body,
+body.glasses-body {
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+html.rokid-webview .glasses-camera__start {
+  background: #000;
+}
+
+html.rokid-webview .glasses-page__error-bar {
+  background: #000;
+  border-color: #39ff14;
+  color: #39ff14;
+}
+
 .glasses-page__hud-top {
   position: absolute;
   top: 0;
@@ -65,6 +90,25 @@
   object-fit: cover;
   transform: scaleX(-1);
   opacity: 0.35;
+}
+
+/* 隐藏预览，摄像头仍在后台采集 */
+.glasses-camera__video--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  transform: none;
+}
+
+.glasses-camera--boxes-only {
+  background: #000;
+}
+
+.glasses-camera--boxes-only .glasses-camera__overlay {
+  background: transparent;
 }
 
 .glasses-camera__overlay {
@@ -134,30 +178,51 @@
   position: absolute;
   inset: 0;
   z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  text-align: center;
   pointer-events: none;
+  background: #000;
 }
 
-.glasses-page__center-hud::before {
-  content: "";
+.glasses-page__crosshair {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 72px;
-  height: 72px;
+  width: 56px;
+  height: 56px;
   transform: translate(-50%, -50%);
-  border: 2px solid rgba(57, 255, 20, 0.35);
-  border-radius: 50%;
-  box-shadow: 0 0 24px rgba(57, 255, 20, 0.15);
+  pointer-events: none;
+}
+
+.glasses-page__crosshair::before,
+.glasses-page__crosshair::after {
+  content: "";
+  position: absolute;
+  background: rgba(57, 255, 20, 0.75);
+  box-shadow: 0 0 10px rgba(57, 255, 20, 0.45);
+}
+
+.glasses-page__crosshair::before {
+  left: 50%;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  transform: translateX(-50%);
+}
+
+.glasses-page__crosshair::after {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  transform: translateY(-50%);
 }
 
 .glasses-page__center-name {
-  position: relative;
+  position: absolute;
+  top: calc(50% + 44px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 92vw;
   font-size: clamp(2.75rem, 14vw, 5rem);
   font-weight: 700;
   line-height: 1.05;
@@ -175,25 +240,47 @@
     0 2px 8px rgba(0, 0, 0, 0.9);
 }
 
-.glasses-page__center-sub {
-  position: relative;
-  margin-top: 10px;
-  font-size: clamp(1rem, 4vw, 1.35rem);
-  opacity: 0.9;
-  color: #a8ffb0;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
+.glasses-page__name-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  padding: 24px 20px 32px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 60%, transparent);
+  text-align: center;
+  pointer-events: none;
 }
 
-.glasses-page__center-sub--unknown {
+.glasses-page__name {
+  font-size: clamp(2.5rem, 12vw, 4.5rem);
+  font-weight: 700;
+  line-height: 1.1;
+  color: #39ff14;
+  text-shadow: 0 0 20px rgba(57, 255, 20, 0.6);
+  letter-spacing: 0.08em;
+}
+
+.glasses-page__name--unknown {
+  color: #ff6666;
+  text-shadow: 0 0 16px rgba(255, 68, 68, 0.5);
+}
+
+.glasses-page__sub {
+  margin-top: 8px;
+  font-size: clamp(1rem, 4vw, 1.25rem);
+  opacity: 0.85;
+  color: #a8ffb0;
+}
+
+.glasses-page__sub--unknown {
   color: #ffaaaa;
 }
 
-.glasses-page__center-idle {
-  position: relative;
-  font-size: clamp(1.1rem, 4vw, 1.4rem);
-  opacity: 0.55;
+.glasses-page__idle {
+  font-size: 1.25rem;
+  opacity: 0.5;
   color: #888;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
 }
 
 .glasses-page__hint {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FaceMatch } from "../api/client";
-import { getCameraErrorMessage, isSecureEnoughForCamera, openCameraStream } from "../utils/cameraUtils";
+import { getCameraErrorMessage, isSecureEnoughForCamera, mapFaceBboxToOverlay, openCameraStream } from "../utils/cameraUtils";
+import { isRokidWebView } from "../config/runtime";
 
 interface GlassesCameraProps {
   onFrame?: (jpeg: ArrayBuffer) => void;
@@ -9,6 +10,12 @@ interface GlassesCameraProps {
   fps?: number;
   captureMaxWidth?: number;
   captureQuality?: number;
+  /** 仅采集帧、不显示画面（Rokid 眼镜端） */
+  hideVideo?: boolean;
+  /** Rokid 套壳打开时自动开启摄像头 */
+  autoStart?: boolean;
+  /** 不绘制人脸框（Rokid 仅显示中心姓名） */
+  hideOverlay?: boolean;
 }
 
 export function GlassesCamera({
@@ -18,11 +25,16 @@ export function GlassesCamera({
   fps = 8,
   captureMaxWidth = 640,
   captureQuality = 0.6,
+  hideVideo = false,
+  autoStart = false,
+  hideOverlay = false,
 }: GlassesCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const captureRef = useRef<HTMLCanvasElement>(null);
   const captureSizeRef = useRef({ width: 0, height: 0 });
+  const encodingRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
@@ -37,7 +49,12 @@ export function GlassesCamera({
 
   const startCamera = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError("不支持摄像头");
+      const insecure = typeof window !== "undefined" && window.location.protocol === "http:";
+      setCameraError(
+        insecure && isRokidWebView()
+          ? "HTTP 无法调用摄像头，请等待 App 自动切换到 HTTPS"
+          : "不支持摄像头",
+      );
       return;
     }
     if (!isSecureEnoughForCamera()) {
@@ -71,11 +88,17 @@ export function GlassesCamera({
   }, [stopStream]);
 
   useEffect(() => {
+    if (autoStart && !active && !starting && !cameraError) {
+      void startCamera();
+    }
+  }, [autoStart, active, starting, cameraError, startCamera]);
+
+  useEffect(() => {
     if (!active || !onFrame) return;
     const interval = setInterval(() => {
       const video = videoRef.current;
       const capture = captureRef.current;
-      if (!video || !capture || video.readyState < 2) return;
+      if (!video || !capture || video.readyState < 2 || encodingRef.current) return;
 
       let drawW = video.videoWidth;
       let drawH = video.videoHeight;
@@ -91,8 +114,10 @@ export function GlassesCamera({
       ctx.drawImage(video, 0, 0, drawW, drawH);
       captureSizeRef.current = { width: drawW, height: drawH };
       onFrameSize?.(drawW, drawH);
+      encodingRef.current = true;
       capture.toBlob(
         (blob) => {
+          encodingRef.current = false;
           if (blob) blob.arrayBuffer().then(onFrame);
         },
         "image/jpeg",
@@ -103,30 +128,44 @@ export function GlassesCamera({
   }, [active, onFrame, onFrameSize, fps, captureMaxWidth, captureQuality]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || hideOverlay) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas) return;
+    const container = containerRef.current;
+    if (!video || !canvas || !container) return;
 
     let raf: number;
     const draw = () => {
       if (video.readyState >= 2) {
-        canvas.width = video.clientWidth;
-        canvas.height = video.clientHeight;
+        const rect = hideVideo
+          ? container.getBoundingClientRect()
+          : video.getBoundingClientRect();
+        const w = Math.round(rect.width) || container.clientWidth;
+        const h = Math.round(rect.height) || container.clientHeight;
+        if (w < 1 || h < 1) {
+          raf = requestAnimationFrame(draw);
+          return;
+        }
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           const srcW = captureSizeRef.current.width || video.videoWidth;
           const srcH = captureSizeRef.current.height || video.videoHeight;
-          const scaleX = canvas.width / srcW;
-          const scaleY = canvas.height / srcH;
+          const overlayFit = hideVideo ? "fill" : "cover";
 
           for (const face of faces) {
-            const [x1, y1, x2, y2] = face.bbox;
-            const left = canvas.width - x2 * scaleX;
-            const top = y1 * scaleY;
-            const width = (x2 - x1) * scaleX;
-            const height = (y2 - y1) * scaleY;
+            const { left, top, width, height } = mapFaceBboxToOverlay(
+              face.bbox,
+              srcW,
+              srcH,
+              canvas.width,
+              canvas.height,
+              { objectFit: overlayFit, mirrored: false },
+            );
             const known = face.name !== "未知";
 
             ctx.strokeStyle = known ? "#39FF14" : "#FF4444";
@@ -147,10 +186,10 @@ export function GlassesCamera({
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [faces, active]);
+  }, [faces, active, hideVideo, hideOverlay]);
 
   return (
-    <div className="glasses-camera">
+    <div ref={containerRef} className={`glasses-camera${hideVideo ? " glasses-camera--boxes-only" : ""}`}>
       {!active && (
         <div className="glasses-camera__start">
           {!isSecureEnoughForCamera() && (
@@ -164,7 +203,12 @@ export function GlassesCamera({
           </button>
         </div>
       )}
-      <video ref={videoRef} className="glasses-camera__video" playsInline muted />
+      <video
+        ref={videoRef}
+        className={`glasses-camera__video${hideVideo ? " glasses-camera__video--hidden" : ""}`}
+        playsInline
+        muted
+      />
       <canvas ref={canvasRef} className="glasses-camera__overlay" />
       <canvas ref={captureRef} hidden />
     </div>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NameFace Rokid</string>
+    <string name="settings_title">服务器设置</string>
+    <string name="settings_hint">填写运行 NameFaceAI 的电脑 IP，或点「自动搜索」扫描局域网。眼镜与电脑需在同一 WiFi。</string>
+    <string name="frontend_host">前端地址（例 192.168.1.10:5173）</string>
+    <string name="backend_host">后端地址（例 192.168.1.10:8000）</string>
+    <string name="use_https">使用 HTTPS（Vite 开发默认开启）</string>
+    <string name="allow_insecure_ssl">信任自签名证书（开发环境）</string>
+    <string name="save">保存并返回</string>
+    <string name="settings_saved">已保存</string>
+    <string name="settings_invalid">请填写完整地址</string>
+    <string name="discover_servers">自动搜索服务器</string>
+    <string name="discovering">正在搜索局域网内的 NameFaceAI…</string>
+    <string name="discover_success">已找到：%1$s</string>
+    <string name="discover_failed">未找到服务器，请检查 WiFi 与电脑是否已启动 NameFaceAI</string>
+    <string name="discover_no_network">未连接 WiFi，无法自动搜索</string>
+    <string name="page_load_failed">页面加载失败，正在重新搜索服务器…</string>
+    <string name="camera_permission_denied">需要摄像头权限才能识别人脸</string>
+    <string name="ssl_error">SSL 证书校验失败，可在设置中开启「信任自签名证书」</string>
+</resources>

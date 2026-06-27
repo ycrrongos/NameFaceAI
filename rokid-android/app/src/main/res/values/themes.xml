@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.NameFaceRokid" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#6750A4</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowBackground">#000000</item>
+    </style>
+
+    <style name="Theme.NameFaceRokid.Fullscreen" parent="Theme.NameFaceRokid">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <item name="android:windowBackground">#000000</item>
+    </style>
+
+    <style name="Theme.NameFaceRokid.Settings" parent="Theme.Material3.DayNight.Dialog">
+        <item name="colorPrimary">#6750A4</item>
+    </style>
+</resources>

@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FaceMatch } from "../api/client";
-import { getCameraErrorMessage, isSecureEnoughForCamera, openCameraStream } from "../utils/cameraUtils";
+import { getCameraErrorMessage, isSecureEnoughForCamera, mapFaceBboxToOverlay, openCameraStream } from "../utils/cameraUtils";
 
 interface CameraViewProps {
   onFrame?: (jpeg: ArrayBuffer) => void;
@@ -154,17 +154,16 @@ export function CameraView({
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           const srcW = captureSizeRef.current.width || video.videoWidth;
           const srcH = captureSizeRef.current.height || video.videoHeight;
-          const scaleX = canvas.width / srcW;
-          const scaleY = canvas.height / srcH;
 
           for (const face of faces) {
-            const [x1, y1, x2, y2] = face.bbox;
-            let left = x1 * scaleX;
-            const top = y1 * scaleY;
-            let width = (x2 - x1) * scaleX;
-            const height = (y2 - y1) * scaleY;
-            if (mirrored) left = canvas.width - left - width;
-
+            const { left, top, width, height } = mapFaceBboxToOverlay(
+              face.bbox,
+              srcW,
+              srcH,
+              canvas.width,
+              canvas.height,
+              { objectFit: "cover", mirrored },
+            );
             const isKnown = face.name !== "未知";
             ctx.strokeStyle = isKnown ? "#386A20" : "#B3261E";
             ctx.lineWidth = 3;
