@@ -12,6 +12,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AppLayout } from "./layout/AppLayout.tsx";
 import { AssistantPage } from "./pages/AssistantPage.tsx";
 import { EnrollPage } from "./pages/EnrollPage.tsx";
+import { GlassesPage } from "./pages/GlassesPage.tsx";
 import { RecognizePage } from "./pages/RecognizePage.tsx";
 import { StudentsPage } from "./pages/StudentsPage.tsx";
 import { m3Theme } from "./theme/m3Theme.ts";
@@ -23,6 +24,8 @@ createRoot(document.getElementById("root")!).render(
       <CssBaseline />
       <BrowserRouter>
         <Routes>
+          <Route path="/rokid" element={<GlassesPage />} />
+          <Route path="/glasses" element={<GlassesPage />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<RecognizePage />} />
             <Route path="/enroll" element={<EnrollPage />} />

@@ -1,4 +1,5 @@
 import RefreshIcon from "@mui/icons-material/Refresh";
+import VideocamIcon from "@mui/icons-material/Videocam";
 import VideocamOffIcon from "@mui/icons-material/VideocamOff";
 import {
   Alert,
@@ -13,6 +14,7 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FaceMatch } from "../api/client";
+import { getCameraErrorMessage, isSecureEnoughForCamera, openCameraStream } from "../utils/cameraUtils";
 
 interface CameraViewProps {
   onFrame?: (jpeg: ArrayBuffer) => void;
@@ -22,28 +24,7 @@ interface CameraViewProps {
   captureQuality?: number;
   showOverlay?: boolean;
   mirrored?: boolean;
-}
-
-function getCameraErrorMessage(err: unknown): string {
-  if (typeof window !== "undefined" && !window.isSecureContext) {
-    const host = window.location.hostname;
-    if (host !== "localhost" && host !== "127.0.0.1") {
-      return `请使用 http://localhost:${window.location.port} 访问以启用摄像头`;
-    }
-  }
-  if (err instanceof DOMException) {
-    switch (err.name) {
-      case "NotAllowedError":
-        return "摄像头权限被拒绝，请在浏览器设置中允许访问";
-      case "NotFoundError":
-        return "未检测到摄像头设备";
-      case "NotReadableError":
-        return "摄像头被其他程序占用";
-      default:
-        return err.message;
-    }
-  }
-  return "无法访问摄像头，请检查浏览器权限";
+  requireUserGesture?: boolean;
 }
 
 export function CameraView({
@@ -54,6 +35,7 @@ export function CameraView({
   captureQuality = 0.65,
   showOverlay = true,
   mirrored = true,
+  requireUserGesture = false,
 }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -64,11 +46,13 @@ export function CameraView({
   const [deviceId, setDeviceId] = useState<string>("");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [active, setActive] = useState(false);
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
+    setActive(false);
   }, []);
 
   const startCamera = useCallback(
@@ -77,16 +61,16 @@ export function CameraView({
         setCameraError("当前浏览器不支持摄像头");
         return;
       }
+      if (!isSecureEnoughForCamera()) {
+        const { hostname, port } = window.location;
+        setCameraError(`请使用 https://${hostname}:${port} 访问（当前为非安全连接）`);
+        return;
+      }
       setStarting(true);
       setCameraError(null);
       stopStream();
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: selectedId
-            ? { deviceId: { ideal: selectedId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-            : { width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        });
+        const stream = await openCameraStream(selectedId);
         streamRef.current = stream;
         const video = videoRef.current;
         if (!video) {
@@ -94,7 +78,10 @@ export function CameraView({
           return;
         }
         video.srcObject = stream;
+        video.playsInline = true;
+        video.muted = true;
         await video.play();
+        setActive(true);
         const allDevices = await navigator.mediaDevices.enumerateDevices();
         setDevices(allDevices.filter((d) => d.kind === "videoinput"));
       } catch (err) {
@@ -108,18 +95,20 @@ export function CameraView({
   );
 
   useEffect(() => {
-    let active = true;
+    if (requireUserGesture) return;
+    if (!isSecureEnoughForCamera()) return;
+    let alive = true;
     void (async () => {
-      if (active) await startCamera(deviceId || undefined);
+      if (alive) await startCamera(deviceId || undefined);
     })();
     return () => {
-      active = false;
+      alive = false;
       stopStream();
     };
-  }, [deviceId, startCamera, stopStream]);
+  }, [deviceId, requireUserGesture, startCamera, stopStream]);
 
   useEffect(() => {
-    if (!onFrame) return;
+    if (!active || !onFrame) return;
     const interval = setInterval(() => {
       const video = videoRef.current;
       const capture = captureRef.current;
@@ -147,10 +136,10 @@ export function CameraView({
       );
     }, 1000 / fps);
     return () => clearInterval(interval);
-  }, [onFrame, fps, captureMaxWidth, captureQuality]);
+  }, [active, onFrame, fps, captureMaxWidth, captureQuality]);
 
   useEffect(() => {
-    if (!showOverlay) return;
+    if (!showOverlay || !active) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
@@ -197,18 +186,30 @@ export function CameraView({
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [faces, showOverlay, mirrored]);
+  }, [faces, showOverlay, mirrored, active]);
+
+  const showStartButton = !active && (requireUserGesture || !isSecureEnoughForCamera() || cameraError);
 
   return (
     <Stack spacing={2}>
-      {devices.length > 1 && (
+      {!isSecureEnoughForCamera() && (
+        <Alert severity="warning">
+          通过 IP 访问需使用 HTTPS：
+          <strong> https://{window.location.hostname}:{window.location.port} </strong>
+        </Alert>
+      )}
+
+      {devices.length > 1 && active && (
         <FormControl size="small" sx={{ maxWidth: 320 }}>
           <InputLabel id="camera-select-label">摄像头</InputLabel>
           <Select
             labelId="camera-select-label"
             label="摄像头"
             value={deviceId}
-            onChange={(e) => setDeviceId(e.target.value)}
+            onChange={(e) => {
+              setDeviceId(e.target.value);
+              void startCamera(e.target.value || undefined);
+            }}
           >
             <MenuItem value="">默认摄像头</MenuItem>
             {devices.map((d) => (
@@ -234,15 +235,8 @@ export function CameraView({
         </Alert>
       )}
 
-      <Card sx={{ overflow: "hidden" }}>
-        <Box
-          sx={{
-            position: "relative",
-            bgcolor: "#1a1a2e",
-            aspectRatio: "16 / 9",
-            maxHeight: 480,
-          }}
-        >
+      <Card sx={{ overflow: "hidden", position: "relative" }}>
+        <Box sx={{ position: "relative", bgcolor: "#1a1a2e", aspectRatio: "16 / 9", maxHeight: 480 }}>
           <Box
             component="video"
             ref={videoRef}
@@ -257,17 +251,29 @@ export function CameraView({
             }}
           />
           {showOverlay && (
+            <Box component="canvas" ref={canvasRef} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
+          )}
+          {showStartButton && (
             <Box
-              component="canvas"
-              ref={canvasRef}
               sx={{
                 position: "absolute",
                 inset: 0,
-                width: "100%",
-                height: "100%",
-                pointerEvents: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                bgcolor: "rgba(0,0,0,0.55)",
               }}
-            />
+            >
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<VideocamIcon />}
+                disabled={starting}
+                onClick={() => void startCamera(deviceId || undefined)}
+              >
+                {starting ? "正在开启…" : "开启摄像头"}
+              </Button>
+            </Box>
           )}
         </Box>
       </Card>

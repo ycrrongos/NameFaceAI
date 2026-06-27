@@ -1,10 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE ?? "";
-
-function wsUrl(): string {
-  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}/ws/recognize`;
-}
+import { getApiBase, getWsRecognizeUrl } from "../config/runtime";
 
 export interface Student {
   id: number;
@@ -37,8 +31,16 @@ export interface HealthInfo {
   llm_provider: string | null;
 }
 
+function apiBase(): string {
+  return getApiBase();
+}
+
+export function wsRecognizeUrl(): string {
+  return getWsRecognizeUrl();
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const resp = await fetch(`${API_BASE}${path}`, {
+  const resp = await fetch(`${apiBase()}${path}`, {
     headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,
   });
@@ -88,5 +90,6 @@ export const api = {
     }),
 };
 
+/** @deprecated use wsRecognizeUrl() */
 export const WS_RECOGNIZE_URL =
-  typeof window !== "undefined" ? wsUrl() : "ws://localhost:8000/ws/recognize";
+  typeof window !== "undefined" ? getWsRecognizeUrl() : "ws://localhost:8000/ws/recognize";

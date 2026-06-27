@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FaceMatch } from "../api/client";
-import { WS_RECOGNIZE_URL } from "../api/client";
+import { wsRecognizeUrl } from "../api/client";
 
 interface RecognizeMessage {
   faces?: FaceMatch[];
@@ -19,7 +19,7 @@ export function useRecognizeWebSocket(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
 
-    const ws = new WebSocket(WS_RECOGNIZE_URL);
+    const ws = new WebSocket(wsRecognizeUrl());
     wsRef.current = ws;
 
     ws.onopen = () => {

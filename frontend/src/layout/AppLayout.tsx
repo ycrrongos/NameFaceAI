@@ -2,6 +2,7 @@ import FaceRetouchingNaturalIcon from "@mui/icons-material/FaceRetouchingNatural
 import GroupsIcon from "@mui/icons-material/Groups";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
+import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import {
   AppBar,
   Box,
@@ -25,6 +26,7 @@ const iconMap = {
   person_add: PersonAddIcon,
   groups: GroupsIcon,
   smart_toy: SmartToyIcon,
+  rokid: ViewInArIcon,
 };
 
 const titleMap: Record<string, string> = {
@@ -32,6 +34,8 @@ const titleMap: Record<string, string> = {
   "/enroll": "录入学生",
   "/students": "学生管理",
   "/assistant": "AI 助手",
+  "/rokid": "Rokid 眼镜",
+  "/glasses": "Rokid 眼镜",
 };
 
 export function AppLayout() {

@@ -91,4 +91,5 @@ export const navItems = [
   { path: "/enroll", label: "录入学生", icon: "person_add" as const },
   { path: "/students", label: "学生管理", icon: "groups" as const },
   { path: "/assistant", label: "AI 助手", icon: "smart_toy" as const },
+  { path: "/rokid", label: "Rokid 眼镜", icon: "rokid" as const },
 ] as const;
