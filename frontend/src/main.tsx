@@ -28,6 +28,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/glasses" element={<GlassesPage />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<RecognizePage />} />
+            <Route path="/recognize" element={<RecognizePage />} />
             <Route path="/enroll" element={<EnrollPage />} />
             <Route path="/students" element={<StudentsPage />} />
             <Route path="/assistant" element={<AssistantPage />} />

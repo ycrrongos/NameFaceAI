@@ -13,6 +13,10 @@ export default defineConfig({
         target: "ws://localhost:8000",
         ws: true,
       },
+      "/phone-cam": {
+        target: "http://127.0.0.1:8765",
+        rewrite: (path) => path.replace(/^\/phone-cam/, ""),
+      },
     },
   },
 });

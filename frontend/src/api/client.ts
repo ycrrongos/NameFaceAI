@@ -31,6 +31,15 @@ export interface HealthInfo {
   llm_provider: string | null;
 }
 
+export interface NameTagOcrResult {
+  name: string | null;
+  class_name: string | null;
+  confidence: number;
+  raw_text: string | null;
+  face_detected: boolean;
+  face_bbox: number[] | null;
+}
+
 function apiBase(): string {
   return getApiBase();
 }
@@ -80,6 +89,21 @@ export const api = {
     data: { name: string; class_name?: string; notes?: string; images: string[] }
   ) =>
     request<Student>(`/api/students/${id}/enroll`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  detectNameTag: (image: string) =>
+    request<NameTagOcrResult>("/api/ocr/name-tag", {
+      method: "POST",
+      body: JSON.stringify({ image }),
+    }),
+  enrollFromNameTag: (data: {
+    images: string[];
+    name?: string;
+    class_name?: string;
+    notes?: string;
+  }) =>
+    request<Student>("/api/ocr/enroll-nametag", {
       method: "POST",
       body: JSON.stringify(data),
     }),

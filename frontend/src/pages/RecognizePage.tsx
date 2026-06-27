@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { CameraView } from "../components/CameraView";
+import { getPhoneCameraStreamUrl } from "../config/runtime";
 import { useRecognizeWebSocket } from "../hooks/useWebSocket";
 
 export function RecognizePage() {
@@ -80,6 +81,7 @@ export function RecognizePage() {
         fps={fps}
         captureMaxWidth={1280}
         captureQuality={0.75}
+        streamUrl={getPhoneCameraStreamUrl()}
       />
 
       <Box>

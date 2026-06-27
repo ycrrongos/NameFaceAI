@@ -31,3 +31,10 @@ export function getWsRecognizeUrl(): string {
 export function isGlassesRoute(): boolean {
   return window.location.pathname.startsWith("/rokid") || window.location.pathname.startsWith("/glasses");
 }
+
+/** ?camera=phone — 使用 USB 手机摄像头 MJPEG 桥（scripts/phone-mjpeg-bridge.sh） */
+export function getPhoneCameraStreamUrl(): string | null {
+  const mode = new URLSearchParams(window.location.search).get("camera");
+  if (mode !== "phone") return null;
+  return "/phone-cam/cam.mjpg";
+}

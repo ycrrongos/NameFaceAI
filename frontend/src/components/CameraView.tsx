@@ -25,6 +25,8 @@ interface CameraViewProps {
   showOverlay?: boolean;
   mirrored?: boolean;
   requireUserGesture?: boolean;
+  /** MJPEG 地址（?camera=phone + phone-mjpeg-bridge.sh） */
+  streamUrl?: string | null;
 }
 
 export function CameraView({
@@ -36,8 +38,10 @@ export function CameraView({
   showOverlay = true,
   mirrored = true,
   requireUserGesture = false,
+  streamUrl = null,
 }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const captureRef = useRef<HTMLCanvasElement>(null);
   const captureSizeRef = useRef({ width: 0, height: 0 });
@@ -47,6 +51,25 @@ export function CameraView({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [active, setActive] = useState(false);
+  const useStream = Boolean(streamUrl);
+
+  const frameReady = useCallback(() => {
+    if (useStream) {
+      const img = imgRef.current;
+      return Boolean(img && img.naturalWidth > 0);
+    }
+    const video = videoRef.current;
+    return Boolean(video && video.readyState >= 2);
+  }, [useStream]);
+
+  const frameSize = useCallback(() => {
+    if (useStream) {
+      const img = imgRef.current;
+      return { w: img?.naturalWidth ?? 0, h: img?.naturalHeight ?? 0 };
+    }
+    const video = videoRef.current;
+    return { w: video?.videoWidth ?? 0, h: video?.videoHeight ?? 0 };
+  }, [useStream]);
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -95,6 +118,36 @@ export function CameraView({
   );
 
   useEffect(() => {
+    if (!useStream || !streamUrl) return;
+    setCameraError(null);
+    setStarting(true);
+    const img = imgRef.current;
+    if (!img) {
+      setStarting(false);
+      return;
+    }
+    const onLoad = () => {
+      setActive(true);
+      setStarting(false);
+    };
+    const onError = () => {
+      setActive(false);
+      setStarting(false);
+      setCameraError("无法连接手机摄像头。请先运行：./scripts/phone-mjpeg-bridge.sh");
+    };
+    img.addEventListener("load", onLoad);
+    img.addEventListener("error", onError);
+    img.src = streamUrl;
+    return () => {
+      img.removeEventListener("load", onLoad);
+      img.removeEventListener("error", onError);
+      img.removeAttribute("src");
+      setActive(false);
+    };
+  }, [streamUrl, useStream]);
+
+  useEffect(() => {
+    if (useStream) return;
     if (requireUserGesture) return;
     if (!isSecureEnoughForCamera()) return;
     let alive = true;
@@ -105,17 +158,21 @@ export function CameraView({
       alive = false;
       stopStream();
     };
-  }, [deviceId, requireUserGesture, startCamera, stopStream]);
+  }, [deviceId, requireUserGesture, startCamera, stopStream, useStream]);
 
   useEffect(() => {
     if (!active || !onFrame) return;
     const interval = setInterval(() => {
-      const video = videoRef.current;
       const capture = captureRef.current;
-      if (!video || !capture || video.readyState < 2) return;
+      if (!capture || !frameReady()) return;
+      const source = useStream ? imgRef.current : videoRef.current;
+      if (!source) return;
 
-      let drawW = video.videoWidth;
-      let drawH = video.videoHeight;
+      const { w: srcW, h: srcH } = frameSize();
+      if (srcW <= 0 || srcH <= 0) return;
+
+      let drawW = srcW;
+      let drawH = srcH;
       if (captureMaxWidth > 0 && drawW > captureMaxWidth) {
         const scale = captureMaxWidth / drawW;
         drawW = captureMaxWidth;
@@ -125,7 +182,7 @@ export function CameraView({
       capture.height = drawH;
       const ctx = capture.getContext("2d");
       if (!ctx) return;
-      ctx.drawImage(video, 0, 0, drawW, drawH);
+      ctx.drawImage(source, 0, 0, drawW, drawH);
       captureSizeRef.current = { width: drawW, height: drawH };
       capture.toBlob(
         (blob) => {
@@ -136,24 +193,24 @@ export function CameraView({
       );
     }, 1000 / fps);
     return () => clearInterval(interval);
-  }, [active, onFrame, fps, captureMaxWidth, captureQuality]);
+  }, [active, onFrame, fps, captureMaxWidth, captureQuality, frameReady, frameSize, useStream]);
 
   useEffect(() => {
     if (!showOverlay || !active) return;
-    const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas) return;
+    if (!canvas) return;
 
     let raf: number;
     const draw = () => {
-      if (video.readyState >= 2) {
-        canvas.width = video.clientWidth;
-        canvas.height = video.clientHeight;
+      if (frameReady()) {
+        const display = useStream ? imgRef.current : videoRef.current;
+        canvas.width = display?.clientWidth ?? canvas.clientWidth;
+        canvas.height = display?.clientHeight ?? canvas.clientHeight;
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
-          const srcW = captureSizeRef.current.width || video.videoWidth;
-          const srcH = captureSizeRef.current.height || video.videoHeight;
+          const srcW = captureSizeRef.current.width || frameSize().w;
+          const srcH = captureSizeRef.current.height || frameSize().h;
           const scaleX = canvas.width / srcW;
           const scaleY = canvas.height / srcH;
 
@@ -186,20 +243,25 @@ export function CameraView({
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [faces, showOverlay, mirrored, active]);
+  }, [faces, showOverlay, mirrored, active, frameReady, frameSize, useStream]);
 
-  const showStartButton = !active && (requireUserGesture || !isSecureEnoughForCamera() || cameraError);
+  const showStartButton =
+    !useStream && !active && (requireUserGesture || !isSecureEnoughForCamera() || cameraError);
 
   return (
     <Stack spacing={2}>
-      {!isSecureEnoughForCamera() && (
+      {!isSecureEnoughForCamera() && !useStream && (
         <Alert severity="warning">
           通过 IP 访问需使用 HTTPS：
           <strong> https://{window.location.hostname}:{window.location.port} </strong>
         </Alert>
       )}
 
-      {devices.length > 1 && active && (
+      {useStream && (
+        <Alert severity="info">手机 USB 摄像头（运行 ./scripts/phone-mjpeg-bridge.sh）</Alert>
+      )}
+
+      {devices.length > 1 && active && !useStream && (
         <FormControl size="small" sx={{ maxWidth: 320 }}>
           <InputLabel id="camera-select-label">摄像头</InputLabel>
           <Select
@@ -226,9 +288,11 @@ export function CameraView({
           severity="error"
           icon={<VideocamOffIcon />}
           action={
-            <Button color="inherit" size="small" startIcon={<RefreshIcon />} onClick={() => void startCamera(deviceId || undefined)} disabled={starting}>
-              重试
-            </Button>
+            !useStream ? (
+              <Button color="inherit" size="small" startIcon={<RefreshIcon />} onClick={() => void startCamera(deviceId || undefined)} disabled={starting}>
+                重试
+              </Button>
+            ) : undefined
           }
         >
           {cameraError}
@@ -246,10 +310,24 @@ export function CameraView({
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              display: "block",
+              display: useStream ? "none" : "block",
               transform: mirrored ? "scaleX(-1)" : undefined,
             }}
           />
+          {useStream && (
+            <Box
+              component="img"
+              ref={imgRef}
+              alt="手机摄像头"
+              sx={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+                transform: mirrored ? "scaleX(-1)" : undefined,
+              }}
+            />
+          )}
           {showOverlay && (
             <Box component="canvas" ref={canvasRef} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
           )}

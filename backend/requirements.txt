@@ -8,3 +8,4 @@ opencv-python-headless>=4.10.0
 numpy>=1.26.0
 insightface>=0.7.3
 onnxruntime-gpu>=1.19.0
+rapidocr-onnxruntime>=1.4.0

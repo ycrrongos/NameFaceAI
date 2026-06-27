@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     face_det_thresh: float = 0.4
     face_max_image_size: int = 1280
     face_match_threshold: float = 0.45
+    ocr_text_score: float = 0.5
+    name_tag_roi_height_ratio: float = 1.8
+    name_tag_roi_width_ratio: float = 1.2
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     llm_provider: str = ""
