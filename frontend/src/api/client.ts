@@ -25,6 +25,8 @@ export interface HealthInfo {
   status: string;
   gpu: boolean;
   accelerator: "gpu" | "igpu" | "cpu";
+  accelerator_label: string;
+  accelerator_note?: string | null;
   provider: string;
   inference_ms: number | null;
   model_loaded: boolean;

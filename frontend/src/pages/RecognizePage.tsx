@@ -23,14 +23,14 @@ export function RecognizePage() {
   const [fps, setFps] = useState(10);
   const [gpuMode, setGpuMode] = useState(false);
   const [health, setHealth] = useState<string>("");
+  const [healthNote, setHealthNote] = useState<string | null>(null);
   const { connected, faces, inferenceMs, error, sendFrame } = useRecognizeWebSocket(true);
 
   useEffect(() => {
     api.health().then((h) => {
-      const accel =
-        h.accelerator === "gpu" ? "独显" : h.accelerator === "igpu" ? "集显" : "CPU";
       setGpuMode(h.gpu);
-      setHealth(`${accel} · ${h.provider}`);
+      setHealth(`${h.accelerator_label} · ${h.provider}`);
+      setHealthNote(h.accelerator_note ?? null);
       if (h.gpu) setFps(12);
       else if (h.inference_ms != null) {
         const interval = Math.max(h.inference_ms * 1.5, 300);
@@ -65,6 +65,9 @@ export function RecognizePage() {
             {inferenceMs != null && (
               <Chip icon={<SpeedIcon />} label={`推理 ${inferenceMs.toFixed(0)} ms`} variant="outlined" />
             )}
+            {connected && inferenceMs == null && (
+              <Chip label="等待画面…" variant="outlined" color="warning" />
+            )}
             {faces.length > 0 && (
               <Chip label={`检测到 ${faces.length} 张人脸`} color="primary" variant="outlined" />
             )}
@@ -73,6 +76,7 @@ export function RecognizePage() {
       </Card>
 
       {error && <Alert severity="error">{error}</Alert>}
+      {healthNote && <Alert severity="info">{healthNote}</Alert>}
 
       <CameraView
         faces={faces}

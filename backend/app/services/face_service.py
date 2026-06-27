@@ -8,13 +8,23 @@ from sqlalchemy.orm import Session
 
 from app.config import FACES_DIR, PROJECT_ROOT, settings
 
-# Discrete GPU → integrated GPU → CPU
+# Discrete GPU → Apple / integrated GPU → CPU
 _PROVIDER_PRIORITY: list[tuple[str, str]] = [
     ("CUDAExecutionProvider", "gpu"),  # NVIDIA discrete
     ("ROCMExecutionProvider", "gpu"),  # AMD discrete
+    ("CoreMLExecutionProvider", "igpu"),  # Apple Silicon GPU / Neural Engine
     ("OpenVINOExecutionProvider", "igpu"),  # Intel integrated
     ("DmlExecutionProvider", "igpu"),  # Windows GPU (integrated or discrete)
 ]
+
+_COREML_OPTIONS = {
+    "ModelFormat": "MLProgram",
+    "MLComputeUnits": "ALL",
+}
+
+_CTX_GPU_PROVIDERS = frozenset(
+    {"CUDAExecutionProvider", "ROCMExecutionProvider", "DmlExecutionProvider"}
+)
 
 
 @dataclass
@@ -43,18 +53,29 @@ class FaceService:
     def model_loaded(self) -> bool:
         return self._app is not None
 
-    def _try_load_with_provider(self, provider: str) -> bool:
+    def _provider_chain(self, provider: str) -> list:
         if provider == "CPUExecutionProvider":
-            providers = ["CPUExecutionProvider"]
-            ctx_id = -1
-        else:
-            providers = [provider, "CPUExecutionProvider"]
-            ctx_id = 0
+            return ["CPUExecutionProvider"]
+        if provider == "CoreMLExecutionProvider":
+            return [("CoreMLExecutionProvider", _COREML_OPTIONS), "CPUExecutionProvider"]
+        return [provider, "CPUExecutionProvider"]
+
+    def _models_use_provider(self, app: FaceAnalysis, provider: str) -> bool:
+        for name in ("detection", "recognition"):
+            model = app.models.get(name)
+            if model is None:
+                continue
+            if provider not in model.session.get_providers():
+                return False
+        return True
+
+    def _try_load_with_provider(self, provider: str) -> bool:
+        ctx_id = 0 if provider in _CTX_GPU_PROVIDERS else -1
 
         try:
             app = FaceAnalysis(
                 name=settings.face_model_name,
-                providers=providers,
+                providers=self._provider_chain(provider),
                 allowed_modules=["detection", "recognition"],
             )
             det = settings.face_det_size
@@ -63,8 +84,7 @@ class FaceService:
                 det_size=(det, det),
                 det_thresh=settings.face_det_thresh,
             )
-            active = app.models["detection"].session.get_providers()[0]
-            if active != provider:
+            if not self._models_use_provider(app, provider):
                 return False
             self._app = app
             self.provider = provider

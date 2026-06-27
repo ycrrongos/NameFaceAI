@@ -41,6 +41,9 @@ export function CameraView({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const captureRef = useRef<HTMLCanvasElement>(null);
   const captureSizeRef = useRef({ width: 0, height: 0 });
+  const encodingRef = useRef(false);
+  const onFrameRef = useRef(onFrame);
+  onFrameRef.current = onFrame;
   const streamRef = useRef<MediaStream | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string>("");
@@ -75,6 +78,7 @@ export function CameraView({
         const video = videoRef.current;
         if (!video) {
           stream.getTracks().forEach((t) => t.stop());
+          setCameraError("摄像头初始化失败，请点击「开启摄像头」重试");
           return;
         }
         video.srcObject = stream;
@@ -97,22 +101,29 @@ export function CameraView({
   useEffect(() => {
     if (requireUserGesture) return;
     if (!isSecureEnoughForCamera()) return;
-    let alive = true;
-    void (async () => {
-      if (alive) await startCamera(deviceId || undefined);
-    })();
+    let cancelled = false;
+    const boot = () => {
+      if (cancelled) return;
+      if (!videoRef.current) {
+        requestAnimationFrame(boot);
+        return;
+      }
+      void startCamera(deviceId || undefined);
+    };
+    boot();
     return () => {
-      alive = false;
+      cancelled = true;
       stopStream();
     };
   }, [deviceId, requireUserGesture, startCamera, stopStream]);
 
   useEffect(() => {
-    if (!active || !onFrame) return;
+    if (!active || !onFrameRef.current) return;
     const interval = setInterval(() => {
       const video = videoRef.current;
       const capture = captureRef.current;
-      if (!video || !capture || video.readyState < 2) return;
+      const send = onFrameRef.current;
+      if (!video || !capture || !send || video.readyState < 2 || encodingRef.current) return;
 
       let drawW = video.videoWidth;
       let drawH = video.videoHeight;
@@ -127,16 +138,18 @@ export function CameraView({
       if (!ctx) return;
       ctx.drawImage(video, 0, 0, drawW, drawH);
       captureSizeRef.current = { width: drawW, height: drawH };
+      encodingRef.current = true;
       capture.toBlob(
         (blob) => {
-          if (blob) blob.arrayBuffer().then(onFrame);
+          encodingRef.current = false;
+          if (blob) blob.arrayBuffer().then(send);
         },
         "image/jpeg",
         captureQuality
       );
     }, 1000 / fps);
     return () => clearInterval(interval);
-  }, [active, onFrame, fps, captureMaxWidth, captureQuality]);
+  }, [active, fps, captureMaxWidth, captureQuality]);
 
   useEffect(() => {
     if (!showOverlay || !active) return;
@@ -187,7 +200,7 @@ export function CameraView({
     return () => cancelAnimationFrame(raf);
   }, [faces, showOverlay, mirrored, active]);
 
-  const showStartButton = !active && (requireUserGesture || !isSecureEnoughForCamera() || cameraError);
+  const showStartButton = !active;
 
   return (
     <Stack spacing={2}>
@@ -236,12 +249,11 @@ export function CameraView({
 
       <Card sx={{ overflow: "hidden", position: "relative" }}>
         <Box sx={{ position: "relative", bgcolor: "#1a1a2e", aspectRatio: "16 / 9", maxHeight: 480 }}>
-          <Box
-            component="video"
+          <video
             ref={videoRef}
             playsInline
             muted
-            sx={{
+            style={{
               width: "100%",
               height: "100%",
               objectFit: "cover",

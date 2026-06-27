@@ -61,6 +61,9 @@ async def recognize_ws(websocket: WebSocket) -> None:
         face_service.load_model()
         while True:
             data = await websocket.receive()
+            if data.get("type") == "websocket.disconnect":
+                break
+
             frame: bytes | None = None
 
             if "bytes" in data:
@@ -97,7 +100,7 @@ async def recognize_ws(websocket: WebSocket) -> None:
                 await websocket.send_json(response.model_dump())
             except Exception as exc:
                 await websocket.send_json({"error": str(exc)})
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
         db.close()

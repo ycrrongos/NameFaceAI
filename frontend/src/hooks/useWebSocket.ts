@@ -17,9 +17,10 @@ interface UseRecognizeWebSocketOptions {
 const RECONNECT_MS = 2000;
 
 export function useRecognizeWebSocket(enabled: boolean, options: UseRecognizeWebSocketOptions = {}) {
-  const lowLatency = options.lowLatency ?? isRokidWebView();
+  const lowLatency = options.lowLatency ?? true;
   const wsRef = useRef<WebSocket | null>(null);
   const busyRef = useRef(false);
+  const busyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestFrameRef = useRef<ArrayBuffer | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [connected, setConnected] = useState(false);
@@ -34,7 +35,18 @@ export function useRecognizeWebSocket(enabled: boolean, options: UseRecognizeWeb
     if (!frame) return;
     latestFrameRef.current = null;
     busyRef.current = true;
+    if (busyTimerRef.current) clearTimeout(busyTimerRef.current);
+    busyTimerRef.current = setTimeout(() => {
+      busyRef.current = false;
+      flushLatest();
+    }, 8000);
     ws.send(frame);
+  }, []);
+
+  const releaseBusy = useCallback(() => {
+    if (busyTimerRef.current) clearTimeout(busyTimerRef.current);
+    busyTimerRef.current = null;
+    busyRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -56,7 +68,7 @@ export function useRecognizeWebSocket(enabled: boolean, options: UseRecognizeWeb
       ws.onclose = () => {
         setConnected(false);
         wsRef.current = null;
-        busyRef.current = false;
+        releaseBusy();
         if (!closed) {
           reconnectTimer.current = setTimeout(connect, RECONNECT_MS);
         }
@@ -66,18 +78,23 @@ export function useRecognizeWebSocket(enabled: boolean, options: UseRecognizeWeb
         setError(`WebSocket 连接失败${hint}`);
       };
       ws.onmessage = (event) => {
-        const data: RecognizeMessage = JSON.parse(
-          typeof event.data === "string" ? event.data : new TextDecoder().decode(event.data),
-        );
-        busyRef.current = false;
-        if (data.error) {
-          setError(data.error);
-          return;
+        try {
+          const data: RecognizeMessage = JSON.parse(
+            typeof event.data === "string" ? event.data : new TextDecoder().decode(event.data),
+          );
+          if (data.error) {
+            setError(data.error);
+            return;
+          }
+          setError(null);
+          if (data.faces != null) setFaces(data.faces);
+          if (data.inference_ms != null) setInferenceMs(data.inference_ms);
+        } catch {
+          setError("识别响应解析失败");
+        } finally {
+          releaseBusy();
+          if (lowLatency) flushLatest();
         }
-        setError(null);
-        if (data.faces) setFaces(data.faces);
-        if (data.inference_ms != null) setInferenceMs(data.inference_ms);
-        if (lowLatency) flushLatest();
       };
     };
 
@@ -89,9 +106,9 @@ export function useRecognizeWebSocket(enabled: boolean, options: UseRecognizeWeb
       wsRef.current?.close();
       wsRef.current = null;
       latestFrameRef.current = null;
-      busyRef.current = false;
+      releaseBusy();
     };
-  }, [enabled, lowLatency, flushLatest]);
+  }, [enabled, lowLatency, flushLatest, releaseBusy]);
 
   const sendFrame = useCallback(
     (jpeg: ArrayBuffer) => {
@@ -103,6 +120,10 @@ export function useRecognizeWebSocket(enabled: boolean, options: UseRecognizeWeb
       const ws = wsRef.current;
       if (!ws || ws.readyState !== WebSocket.OPEN || busyRef.current) return;
       busyRef.current = true;
+      if (busyTimerRef.current) clearTimeout(busyTimerRef.current);
+      busyTimerRef.current = setTimeout(() => {
+        busyRef.current = false;
+      }, 8000);
       ws.send(jpeg);
     },
     [lowLatency, flushLatest],
