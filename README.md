@@ -118,6 +118,13 @@ DASHSCOPE_API_KEY=sk-xxx
 LLM_PROVIDER=deepseek
 DEEPSEEK_API_KEY=sk-xxx
 
+# 或 OpenAI
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-xxx
+OPENAI_MODEL=gpt-4o-mini
+# 若使用第三方 OpenAI 兼容接口，可改 base URL：
+# OPENAI_BASE_URL=https://api.openai.com
+
 # 或本地 Ollama（GPU）
 LLM_PROVIDER=ollama
 OLLAMA_MODEL=qwen2.5:7b

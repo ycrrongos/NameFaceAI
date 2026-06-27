@@ -13,12 +13,14 @@ import {
 import { useEffect, useRef } from "react";
 import type { FaceMatch } from "../api/client";
 import { useRokidPreview } from "../hooks/useRokidPreview";
+import { useI18n } from "../i18n/I18nProvider";
 import { mapFaceBboxToOverlay } from "../utils/cameraUtils";
 
 function drawOverlay(
   canvas: HTMLCanvasElement,
   img: HTMLImageElement,
   faces: FaceMatch[],
+  unknownLabel: string,
 ) {
   const w = img.naturalWidth;
   const h = img.naturalHeight;
@@ -45,7 +47,7 @@ function drawOverlay(
     ctx.lineWidth = 3;
     ctx.strokeRect(left, top, width, height);
 
-    const label = known ? face.name : "?";
+    const label = known ? face.name : unknownLabel;
     ctx.font = "700 20px 'Noto Sans SC', sans-serif";
     const tw = ctx.measureText(label).width + 16;
     ctx.fillStyle = known ? "rgba(57,255,20,0.9)" : "rgba(255,68,68,0.9)";
@@ -56,9 +58,11 @@ function drawOverlay(
 }
 
 export function RokidPreviewPage() {
+  const { t, faceName } = useI18n();
   const { connected, preview, error, frameCount, resetStats } = useRokidPreview(true);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const unknownLabel = faceName("未知");
 
   useEffect(() => {
     const img = imgRef.current;
@@ -66,14 +70,14 @@ export function RokidPreviewPage() {
     if (!img || !canvas || !preview) return;
 
     if (img.complete && img.naturalWidth > 0) {
-      drawOverlay(canvas, img, preview.faces);
+      drawOverlay(canvas, img, preview.faces, unknownLabel);
       return;
     }
 
-    const onLoad = () => drawOverlay(canvas, img, preview.faces);
+    const onLoad = () => drawOverlay(canvas, img, preview.faces, unknownLabel);
     img.addEventListener("load", onLoad);
     return () => img.removeEventListener("load", onLoad);
-  }, [preview]);
+  }, [preview, unknownLabel]);
 
   const fps =
     preview?.frameIntervalMs != null && preview.frameIntervalMs > 0
@@ -85,31 +89,27 @@ export function RokidPreviewPage() {
       <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
         <MonitorIcon color="primary" />
         <Typography variant="h6" sx={{ flex: 1 }}>
-          Rokid 画面预览
+          {t("rokidPreview.title")}
         </Typography>
         <Chip
           size="small"
-          label={connected ? "已连接" : "未连接"}
+          label={connected ? t("rokidPreview.connected") : t("rokidPreview.disconnected")}
           color={connected ? "success" : "default"}
         />
         <Button size="small" startIcon={<RefreshIcon />} onClick={resetStats}>
-          重置统计
+          {t("rokidPreview.resetStats")}
         </Button>
       </Stack>
 
       <Typography variant="body2" color="text.secondary">
-        实时显示眼镜端上传的画面与识别框，用于观察延迟。请先在眼镜上开启 NameFaceAI 识别。
+        {t("rokidPreview.description")}
       </Typography>
 
       {error && <Alert severity="error">{error}</Alert>}
 
-      {!preview && connected && (
-        <Alert severity="info">已连接，等待眼镜端发送画面…</Alert>
-      )}
+      {!preview && connected && <Alert severity="info">{t("rokidPreview.waitingFrame")}</Alert>}
 
-      {!connected && (
-        <Alert severity="warning">未连接到预览服务，请确认后端已启动。</Alert>
-      )}
+      {!connected && <Alert severity="warning">{t("rokidPreview.notConnected")}</Alert>}
 
       <Card sx={{ overflow: "hidden" }}>
         <Box
@@ -128,7 +128,7 @@ export function RokidPreviewPage() {
                 component="img"
                 ref={imgRef}
                 src={preview.imageUrl}
-                alt="Rokid 预览"
+                alt={t("rokidPreview.previewAlt")}
                 sx={{ maxWidth: "100%", maxHeight: 480, display: "block" }}
               />
               <Box
@@ -144,22 +144,19 @@ export function RokidPreviewPage() {
               />
             </Box>
           ) : (
-            <Typography color="text.secondary">暂无画面</Typography>
+            <Typography color="text.secondary">{t("rokidPreview.noFrame")}</Typography>
           )}
         </Box>
 
         <CardContent>
           <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
-            <Chip label={`推理 ${preview ? preview.inferenceMs.toFixed(0) : "—"} ms`} />
-            <Chip label={`处理 ${preview ? preview.totalMs.toFixed(0) : "—"} ms`} />
-            <Chip label={`帧间隔 ${preview?.frameIntervalMs?.toFixed(0) ?? "—"} ms`} />
-            <Chip label={`预览 FPS ${fps}`} />
-            <Chip label={`累计 ${frameCount} 帧`} />
+            <Chip label={t("rokidPreview.inferenceMs", { ms: preview ? preview.inferenceMs.toFixed(0) : "—" })} />
+            <Chip label={t("rokidPreview.processMs", { ms: preview ? preview.totalMs.toFixed(0) : "—" })} />
+            <Chip label={t("rokidPreview.frameInterval", { ms: preview?.frameIntervalMs?.toFixed(0) ?? "—" })} />
+            <Chip label={t("rokidPreview.previewFps", { fps })} />
+            <Chip label={t("rokidPreview.frameCount", { count: frameCount })} />
             {preview && preview.faces.length > 0 && (
-              <Chip
-                color="success"
-                label={preview.faces.map((f) => f.name).join("、")}
-              />
+              <Chip color="success" label={preview.faces.map((f) => faceName(f.name)).join("、")} />
             )}
           </Stack>
         </CardContent>

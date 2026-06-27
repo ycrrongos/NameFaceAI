@@ -26,6 +26,7 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type AttendanceSheet, type AttendanceStatus } from "../api/client";
+import { useI18n } from "../i18n/I18nProvider";
 
 function todayString(): string {
   const d = new Date();
@@ -33,19 +34,15 @@ function todayString(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function formatTime(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
-}
-
-const STATUS_LABELS: Record<AttendanceStatus, string> = {
-  present: "出勤",
-  absent: "缺勤",
-  late: "迟到",
-  excused: "请假",
+const STATUS_KEYS: Record<AttendanceStatus, string> = {
+  present: "attendance.statusPresent",
+  absent: "attendance.statusAbsent",
+  late: "attendance.statusLate",
+  excused: "attendance.statusExcused",
 };
 
 export function AttendancePage() {
+  const { t, dateLocale } = useI18n();
   const [date, setDate] = useState(todayString());
   const [classFilter, setClassFilter] = useState("");
   const [search, setSearch] = useState("");
@@ -54,15 +51,20 @@ export function AttendancePage() {
   const [savingId, setSavingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const formatTime = (iso: string | null) => {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" });
+  };
+
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
     api
       .getAttendanceSheet(date, classFilter || undefined)
       .then(setSheet)
-      .catch((e) => setError(e instanceof Error ? e.message : "加载失败"))
+      .catch((e) => setError(e instanceof Error ? e.message : t("attendance.loadFailed")))
       .finally(() => setLoading(false));
-  }, [date, classFilter]);
+  }, [date, classFilter, t]);
 
   useEffect(() => {
     load();
@@ -87,7 +89,7 @@ export function AttendancePage() {
       await api.markAttendance({ student_id: studentId, date, status });
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "保存失败");
+      setError(e instanceof Error ? e.message : t("attendance.saveFailed"));
     } finally {
       setSavingId(null);
     }
@@ -100,7 +102,7 @@ export function AttendancePage() {
       await api.markAllAttendance({ date, status });
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "批量标记失败");
+      setError(e instanceof Error ? e.message : t("attendance.batchFailed"));
       setLoading(false);
     }
   };
@@ -108,7 +110,7 @@ export function AttendancePage() {
   return (
     <Stack spacing={3}>
       <Alert severity="info" sx={{ borderRadius: 3 }}>
-        展示所有已录入学生的每日考勤。在「实时识别」页面识别到学生时会自动标记为出勤（不覆盖手动记录）。
+        {t("attendance.info")}
       </Alert>
 
       <Card>
@@ -116,22 +118,22 @@ export function AttendancePage() {
           <Stack spacing={2}>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ flexWrap: "wrap" }}>
               <TextField
-                label="日期"
+                label={t("attendance.date")}
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
                 sx={{ minWidth: 160 }}
               />
               <FormControl sx={{ minWidth: 140 }}>
-                <InputLabel id="class-filter-label">班级</InputLabel>
+                <InputLabel id="class-filter-label">{t("attendance.classFilter")}</InputLabel>
                 <Select
                   labelId="class-filter-label"
-                  label="班级"
+                  label={t("attendance.classFilter")}
                   value={classFilter}
                   onChange={(e) => setClassFilter(e.target.value)}
                 >
-                  <MenuItem value="">全部</MenuItem>
+                  <MenuItem value="">{t("common.all")}</MenuItem>
                   {classOptions.map((c) => (
                     <MenuItem key={c} value={c}>
                       {c}
@@ -140,33 +142,33 @@ export function AttendancePage() {
                 </Select>
               </FormControl>
               <TextField
-                label="搜索姓名"
+                label={t("attendance.searchName")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 sx={{ flex: 1, minWidth: 160 }}
               />
               <Button startIcon={<RefreshIcon />} onClick={load} disabled={loading}>
-                刷新
+                {t("common.refresh")}
               </Button>
             </Stack>
 
             {sheet && (
               <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                <Chip icon={<EventNoteIcon />} label={`共 ${sheet.summary.total} 人`} />
-                <Chip color="success" variant="outlined" label={`出勤 ${sheet.summary.present}`} />
-                <Chip color="error" variant="outlined" label={`缺勤 ${sheet.summary.absent}`} />
-                <Chip color="warning" variant="outlined" label={`迟到 ${sheet.summary.late}`} />
-                <Chip color="info" variant="outlined" label={`请假 ${sheet.summary.excused}`} />
-                <Chip variant="outlined" label={`未标记 ${sheet.summary.unmarked}`} />
+                <Chip icon={<EventNoteIcon />} label={t("attendance.total", { count: sheet.summary.total })} />
+                <Chip color="success" variant="outlined" label={t("attendance.present", { count: sheet.summary.present })} />
+                <Chip color="error" variant="outlined" label={t("attendance.absent", { count: sheet.summary.absent })} />
+                <Chip color="warning" variant="outlined" label={t("attendance.late", { count: sheet.summary.late })} />
+                <Chip color="info" variant="outlined" label={t("attendance.excused", { count: sheet.summary.excused })} />
+                <Chip variant="outlined" label={t("attendance.unmarked", { count: sheet.summary.unmarked })} />
               </Stack>
             )}
 
             <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
               <Button variant="outlined" color="success" onClick={() => markAll("present")} disabled={loading}>
-                全部出勤
+                {t("attendance.markAllPresent")}
               </Button>
               <Button variant="outlined" color="error" onClick={() => markAll("absent")} disabled={loading}>
-                全部缺勤
+                {t("attendance.markAllAbsent")}
               </Button>
             </Stack>
           </Stack>
@@ -183,7 +185,7 @@ export function AttendancePage() {
         <Card sx={{ textAlign: "center", py: 6 }}>
           <EventNoteIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
           <Typography color="text.secondary">
-            {sheet?.summary.total === 0 ? "暂无已录入学生" : "没有匹配的学生"}
+            {sheet?.summary.total === 0 ? t("attendance.noStudents") : t("attendance.noMatch")}
           </Typography>
         </Card>
       ) : (
@@ -191,11 +193,11 @@ export function AttendancePage() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>姓名</TableCell>
-                <TableCell>班级</TableCell>
-                <TableCell>考勤状态</TableCell>
-                <TableCell>来源</TableCell>
-                <TableCell>标记时间</TableCell>
+                <TableCell>{t("common.name")}</TableCell>
+                <TableCell>{t("common.className")}</TableCell>
+                <TableCell>{t("attendance.status")}</TableCell>
+                <TableCell>{t("attendance.source")}</TableCell>
+                <TableCell>{t("attendance.markedAt")}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -215,18 +217,26 @@ export function AttendancePage() {
                       }}
                       disabled={savingId === row.student_id}
                     >
-                      {(Object.keys(STATUS_LABELS) as AttendanceStatus[]).map((status) => (
+                      {(Object.keys(STATUS_KEYS) as AttendanceStatus[]).map((status) => (
                         <ToggleButton key={status} value={status}>
-                          {STATUS_LABELS[status]}
+                          {t(STATUS_KEYS[status])}
                         </ToggleButton>
                       ))}
                     </ToggleButtonGroup>
                   </TableCell>
                   <TableCell>
                     {row.source === "auto" && (
-                      <Chip size="small" icon={<CheckCircleIcon />} label="自动" color="success" variant="outlined" />
+                      <Chip
+                        size="small"
+                        icon={<CheckCircleIcon />}
+                        label={t("attendance.sourceAuto")}
+                        color="success"
+                        variant="outlined"
+                      />
                     )}
-                    {row.source === "manual" && <Chip size="small" label="手动" variant="outlined" />}
+                    {row.source === "manual" && (
+                      <Chip size="small" label={t("attendance.sourceManual")} variant="outlined" />
+                    )}
                     {!row.source && "—"}
                   </TableCell>
                   <TableCell>{formatTime(row.marked_at)}</TableCell>

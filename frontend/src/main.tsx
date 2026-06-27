@@ -9,6 +9,7 @@ import "@fontsource/roboto/700.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { I18nProvider } from "./i18n/I18nProvider.tsx";
 import { AppLayout } from "./layout/AppLayout.tsx";
 import { AssistantPage } from "./pages/AssistantPage.tsx";
 import { AttendancePage } from "./pages/AttendancePage.tsx";
@@ -24,6 +25,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider theme={m3Theme} defaultMode="light">
       <CssBaseline />
+      <I18nProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/rokid" element={<GlassesPage />} />
@@ -39,6 +41,7 @@ createRoot(document.getElementById("root")!).render(
           </Route>
         </Routes>
       </BrowserRouter>
+      </I18nProvider>
     </ThemeProvider>
   </StrictMode>
 );

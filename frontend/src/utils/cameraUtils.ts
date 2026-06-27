@@ -1,31 +1,38 @@
 import { isRokidWebView } from "../config/runtime";
 
-export function getCameraErrorMessage(err: unknown): string {
+export interface CameraErrorRef {
+  key: string;
+  params?: Record<string, string | number>;
+}
+
+export function getCameraErrorRef(err: unknown): CameraErrorRef {
   if (typeof window !== "undefined" && !window.isSecureContext) {
     const { hostname, port } = window.location;
     const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
     if (!isLocal) {
-      return `非安全连接无法使用摄像头。请改用 https://${hostname}:${port} 或 http://localhost:${port}`;
+      return { key: "camera.insecureContext", params: { hostname, port } };
     }
   }
 
   if (err instanceof DOMException) {
     switch (err.name) {
       case "NotAllowedError":
-        return "摄像头权限被拒绝。请点击「开启摄像头」并在浏览器中允许访问";
+        return { key: "camera.notAllowed" };
       case "NotFoundError":
-        return "未检测到摄像头设备";
+        return { key: "camera.notFound" };
       case "NotReadableError":
-        return "摄像头被其他程序占用，请关闭后重试";
+        return { key: "camera.notReadable" };
       case "OverconstrainedError":
-        return "摄像头参数不兼容，正在尝试其他模式…";
+        return { key: "camera.overconstrained" };
       default:
-        return err.message || "无法访问摄像头";
+        return { key: "camera.accessFailed" };
     }
   }
 
-  if (err instanceof Error) return err.message;
-  return "无法访问摄像头，请检查浏览器权限";
+  if (err instanceof Error && err.message) {
+    return { key: "camera.accessFailed" };
+  }
+  return { key: "camera.checkPermission" };
 }
 
 type VideoConstraints = MediaTrackConstraints | boolean;

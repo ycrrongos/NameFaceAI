@@ -87,11 +87,11 @@ export const m3Theme = createTheme({
 });
 
 export const navItems = [
-  { path: "/", label: "实时识别", icon: "face" as const },
-  { path: "/enroll", label: "录入学生", icon: "person_add" as const },
-  { path: "/students", label: "学生管理", icon: "groups" as const },
-  { path: "/attendance", label: "考勤表", icon: "attendance" as const },
-  { path: "/assistant", label: "AI 助手", icon: "smart_toy" as const },
-  { path: "/rokid-preview", label: "Rokid 预览", icon: "monitor" as const },
-  { path: "/rokid", label: "Rokid 眼镜", icon: "rokid" as const },
+  { path: "/", labelKey: "nav.recognize", icon: "face" as const },
+  { path: "/enroll", labelKey: "nav.enroll", icon: "person_add" as const },
+  { path: "/students", labelKey: "nav.students", icon: "groups" as const },
+  { path: "/attendance", labelKey: "nav.attendance", icon: "attendance" as const },
+  { path: "/assistant", labelKey: "nav.assistant", icon: "smart_toy" as const },
+  { path: "/rokid-preview", labelKey: "nav.rokidPreview", icon: "monitor" as const },
+  { path: "/rokid", labelKey: "nav.rokid", icon: "rokid" as const },
 ] as const;

@@ -19,6 +19,8 @@ import {
   useTheme,
 } from "@mui/material";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
+import { useI18n } from "../i18n/I18nProvider";
 import { navItems } from "../theme/m3Theme";
 
 const DRAWER_WIDTH = 260;
@@ -33,23 +35,15 @@ const iconMap = {
   rokid: ViewInArIcon,
 };
 
-const titleMap: Record<string, string> = {
-  "/": "实时识别",
-  "/enroll": "录入学生",
-  "/students": "学生管理",
-  "/attendance": "考勤表",
-  "/assistant": "AI 助手",
-  "/rokid-preview": "Rokid 预览",
-  "/rokid": "Rokid 眼镜",
-  "/glasses": "Rokid 眼镜",
-};
-
 export function AppLayout() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const location = useLocation();
   const navigate = useNavigate();
-  const title = titleMap[location.pathname] ?? "NameFaceAI";
+  const { t } = useI18n();
+
+  const currentNav = navItems.find((item) => item.path === location.pathname);
+  const title = currentNav ? t(currentNav.labelKey) : "NameFaceAI";
 
   const drawer = (
     <Box sx={{ py: 2, height: "100%", display: "flex", flexDirection: "column" }}>
@@ -58,11 +52,11 @@ export function AppLayout() {
           NameFaceAI
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          学生人脸记名
+          {t("brand.subtitle")}
         </Typography>
       </Box>
       <List sx={{ px: 1, flex: 1 }}>
-        {navItems.map(({ path, label, icon }) => {
+        {navItems.map(({ path, labelKey, icon }) => {
           const Icon = iconMap[icon];
           const selected = location.pathname === path;
           return (
@@ -85,7 +79,7 @@ export function AppLayout() {
                 <Icon />
               </ListItemIcon>
               <ListItemText
-                primary={label}
+                primary={t(labelKey)}
                 sx={{ "& .MuiTypography-root": { fontWeight: selected ? 600 : 400 } }}
               />
             </ListItemButton>
@@ -131,6 +125,7 @@ export function AppLayout() {
             <Typography variant="h5" component="h1" sx={{ flex: 1 }}>
               {title}
             </Typography>
+            <LanguageSwitcher />
           </Toolbar>
         </AppBar>
 
@@ -144,7 +139,7 @@ export function AppLayout() {
               overflowX: "auto",
             }}
           >
-            {navItems.map(({ path, label, icon }) => {
+            {navItems.map(({ path, labelKey, icon }) => {
               const Icon = iconMap[icon];
               const selected = location.pathname === path;
               return (
@@ -163,7 +158,7 @@ export function AppLayout() {
                   <ListItemIcon sx={{ minWidth: 0, mb: 0.25 }}>
                     <Icon fontSize="small" />
                   </ListItemIcon>
-                  <Typography variant="caption">{label}</Typography>
+                  <Typography variant="caption">{t(labelKey)}</Typography>
                 </ListItemButton>
               );
             })}

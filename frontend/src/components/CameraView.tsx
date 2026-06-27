@@ -14,7 +14,13 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FaceMatch } from "../api/client";
-import { getCameraErrorMessage, isSecureEnoughForCamera, openCameraStream } from "../utils/cameraUtils";
+import { useI18n } from "../i18n/I18nProvider";
+import {
+  getCameraErrorRef,
+  isSecureEnoughForCamera,
+  openCameraStream,
+  type CameraErrorRef,
+} from "../utils/cameraUtils";
 
 interface CameraViewProps {
   onFrame?: (jpeg: ArrayBuffer) => void;
@@ -40,6 +46,7 @@ export function CameraView({
   requireUserGesture = false,
   streamUrl = null,
 }: CameraViewProps) {
+  const { t, faceName } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -48,10 +55,12 @@ export function CameraView({
   const streamRef = useRef<MediaStream | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string>("");
-  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraErrorRef, setCameraErrorRef] = useState<CameraErrorRef | null>(null);
   const [starting, setStarting] = useState(false);
   const [active, setActive] = useState(false);
   const useStream = Boolean(streamUrl);
+
+  const cameraError = cameraErrorRef ? t(cameraErrorRef.key, cameraErrorRef.params) : null;
 
   const frameReady = useCallback(() => {
     if (useStream) {
@@ -72,7 +81,7 @@ export function CameraView({
   }, [useStream]);
 
   const stopStream = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setActive(false);
@@ -81,23 +90,23 @@ export function CameraView({
   const startCamera = useCallback(
     async (selectedId?: string) => {
       if (!navigator.mediaDevices?.getUserMedia) {
-        setCameraError("当前浏览器不支持摄像头");
+        setCameraErrorRef({ key: "camera.unsupported" });
         return;
       }
       if (!isSecureEnoughForCamera()) {
         const { hostname, port } = window.location;
-        setCameraError(`请使用 https://${hostname}:${port} 访问（当前为非安全连接）`);
+        setCameraErrorRef({ key: "camera.insecureAccess", params: { hostname, port } });
         return;
       }
       setStarting(true);
-      setCameraError(null);
+      setCameraErrorRef(null);
       stopStream();
       try {
         const stream = await openCameraStream(selectedId);
         streamRef.current = stream;
         const video = videoRef.current;
         if (!video) {
-          stream.getTracks().forEach((t) => t.stop());
+          stream.getTracks().forEach((track) => track.stop());
           return;
         }
         video.srcObject = stream;
@@ -109,17 +118,17 @@ export function CameraView({
         setDevices(allDevices.filter((d) => d.kind === "videoinput"));
       } catch (err) {
         stopStream();
-        setCameraError(getCameraErrorMessage(err));
+        setCameraErrorRef(getCameraErrorRef(err));
       } finally {
         setStarting(false);
       }
     },
-    [stopStream]
+    [stopStream],
   );
 
   useEffect(() => {
     if (!useStream || !streamUrl) return;
-    setCameraError(null);
+    setCameraErrorRef(null);
     setStarting(true);
     const img = imgRef.current;
     if (!img) {
@@ -133,7 +142,7 @@ export function CameraView({
     const onError = () => {
       setActive(false);
       setStarting(false);
-      setCameraError("无法连接手机摄像头。请先运行：./scripts/phone-mjpeg-bridge.sh");
+      setCameraErrorRef({ key: "camera.phoneConnectFailed" });
     };
     img.addEventListener("load", onLoad);
     img.addEventListener("error", onError);
@@ -189,7 +198,7 @@ export function CameraView({
           if (blob) blob.arrayBuffer().then(onFrame);
         },
         "image/jpeg",
-        captureQuality
+        captureQuality,
       );
     }, 1000 / fps);
     return () => clearInterval(interval);
@@ -227,7 +236,7 @@ export function CameraView({
             ctx.lineWidth = 3;
             ctx.strokeRect(left, top, width, height);
 
-            const label = `${face.name}  ${(face.confidence * 100).toFixed(0)}%`;
+            const label = `${faceName(face.name)}  ${(face.confidence * 100).toFixed(0)}%`;
             ctx.font = "600 22px Roboto, Noto Sans SC, sans-serif";
             const textWidth = ctx.measureText(label).width + 20;
             ctx.fillStyle = isKnown ? "#386A20" : "#B3261E";
@@ -243,40 +252,43 @@ export function CameraView({
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [faces, showOverlay, mirrored, active, frameReady, frameSize, useStream]);
+  }, [faces, showOverlay, mirrored, active, frameReady, frameSize, useStream, faceName]);
 
   const showStartButton =
-    !useStream && !active && (requireUserGesture || !isSecureEnoughForCamera() || cameraError);
+    !useStream && !active && (requireUserGesture || !isSecureEnoughForCamera() || cameraErrorRef);
+
+  const { hostname, port } = window.location;
 
   return (
     <Stack spacing={2}>
       {!isSecureEnoughForCamera() && !useStream && (
         <Alert severity="warning">
-          通过 IP 访问需使用 HTTPS：
-          <strong> https://{window.location.hostname}:{window.location.port} </strong>
+          {t("camera.httpsWarning")}
+          <strong>
+            {" "}
+            https://{hostname}:{port}{" "}
+          </strong>
         </Alert>
       )}
 
-      {useStream && (
-        <Alert severity="info">手机 USB 摄像头（运行 ./scripts/phone-mjpeg-bridge.sh）</Alert>
-      )}
+      {useStream && <Alert severity="info">{t("camera.phoneStreamInfo")}</Alert>}
 
       {devices.length > 1 && active && !useStream && (
         <FormControl size="small" sx={{ maxWidth: 320 }}>
-          <InputLabel id="camera-select-label">摄像头</InputLabel>
+          <InputLabel id="camera-select-label">{t("camera.deviceLabel")}</InputLabel>
           <Select
             labelId="camera-select-label"
-            label="摄像头"
+            label={t("camera.deviceLabel")}
             value={deviceId}
             onChange={(e) => {
               setDeviceId(e.target.value);
               void startCamera(e.target.value || undefined);
             }}
           >
-            <MenuItem value="">默认摄像头</MenuItem>
+            <MenuItem value="">{t("camera.defaultDevice")}</MenuItem>
             {devices.map((d) => (
               <MenuItem key={d.deviceId} value={d.deviceId}>
-                {d.label || `摄像头 ${d.deviceId.slice(0, 8)}`}
+                {d.label || t("camera.deviceFallback", { id: d.deviceId.slice(0, 8) })}
               </MenuItem>
             ))}
           </Select>
@@ -289,8 +301,14 @@ export function CameraView({
           icon={<VideocamOffIcon />}
           action={
             !useStream ? (
-              <Button color="inherit" size="small" startIcon={<RefreshIcon />} onClick={() => void startCamera(deviceId || undefined)} disabled={starting}>
-                重试
+              <Button
+                color="inherit"
+                size="small"
+                startIcon={<RefreshIcon />}
+                onClick={() => void startCamera(deviceId || undefined)}
+                disabled={starting}
+              >
+                {t("common.retry")}
               </Button>
             ) : undefined
           }
@@ -318,7 +336,7 @@ export function CameraView({
             <Box
               component="img"
               ref={imgRef}
-              alt="手机摄像头"
+              alt={t("camera.phoneAlt")}
               sx={{
                 width: "100%",
                 height: "100%",
@@ -329,7 +347,11 @@ export function CameraView({
             />
           )}
           {showOverlay && (
-            <Box component="canvas" ref={canvasRef} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
+            <Box
+              component="canvas"
+              ref={canvasRef}
+              sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}
+            />
           )}
           {showStartButton && (
             <Box
@@ -349,7 +371,7 @@ export function CameraView({
                 disabled={starting}
                 onClick={() => void startCamera(deviceId || undefined)}
               >
-                {starting ? "正在开启…" : "开启摄像头"}
+                {starting ? t("camera.starting") : t("camera.start")}
               </Button>
             </Box>
           )}

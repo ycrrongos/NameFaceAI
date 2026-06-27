@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { GlassesCamera, pickCenterFace } from "../components/GlassesCamera";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { getBackendParam, isRokidWebView } from "../config/runtime";
+import { useI18n } from "../i18n/I18nProvider";
 import { useRecognizeWebSocket } from "../hooks/useWebSocket";
 import "./GlassesPage.css";
 
 export function GlassesPage() {
+  const { t, faceName } = useI18n();
   const rokid = isRokidWebView();
   const [fps, setFps] = useState(8);
   const [gpuMode, setGpuMode] = useState(false);
@@ -42,14 +45,17 @@ export function GlassesPage() {
   }, [rokid]);
 
   useEffect(() => {
-    api.health().then((h) => {
-      setGpuMode(h.gpu);
-      if (h.gpu) setFps(10);
-      else if (h.inference_ms != null) {
-        const interval = Math.max(h.inference_ms * 1.5, 300);
-        setFps(Math.min(4, Math.max(1, Math.round(1000 / interval))));
-      }
-    }).catch(() => {});
+    api
+      .health()
+      .then((h) => {
+        setGpuMode(h.gpu);
+        if (h.gpu) setFps(10);
+        else if (h.inference_ms != null) {
+          const interval = Math.max(h.inference_ms * 1.5, 300);
+          setFps(Math.min(4, Math.max(1, Math.round(1000 / interval))));
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -79,12 +85,13 @@ export function GlassesPage() {
         <div className="glasses-page__hud-top">
           <div className="glasses-page__status">
             <span className={`glasses-page__dot ${connected ? "glasses-page__dot--on" : "glasses-page__dot--warn"}`} />
-            {connected ? "识别 · 自动考勤" : "连接中"}
+            {connected ? t("glasses.statusOn") : t("glasses.statusConnecting")}
           </div>
           <div className="glasses-page__meta">
             {inferenceMs != null && `${inferenceMs.toFixed(0)}ms`}
-            {faces.length > 1 && ` · ${faces.length}人`}
+            {faces.length > 1 && ` · ${t("glasses.peopleCount", { count: faces.length })}`}
           </div>
+          <LanguageSwitcher compact />
         </div>
       )}
 
@@ -107,27 +114,31 @@ export function GlassesPage() {
             {primary ? (
               <>
                 <div className={`glasses-page__name ${isKnown ? "" : "glasses-page__name--unknown"}`}>
-                  {isKnown ? primary.name : "未知"}
+                  {isKnown ? primary.name : faceName("未知")}
                 </div>
                 <div className={`glasses-page__sub ${isKnown ? "" : "glasses-page__sub--unknown"}`}>
                   {isKnown
-                    ? `置信度 ${(primary.confidence * 100).toFixed(0)}%`
-                    : "未录入人脸"}
+                    ? t("glasses.confidence", { pct: (primary.confidence * 100).toFixed(0) })
+                    : t("glasses.notEnrolled")}
                 </div>
                 {isKnown && primaryCheckIn?.checked_in && (
                   <div className={`glasses-page__checkin ${punchFlash ? "glasses-page__checkin--flash" : ""}`}>
-                    ✓ 今日已打卡
-                    {primaryCheckIn.newly_marked ? "（刚刚记录）" : primaryCheckIn.source === "auto" ? "（自动）" : ""}
+                    {t("glasses.checkedIn")}
+                    {primaryCheckIn.newly_marked
+                      ? t("glasses.justMarked")
+                      : primaryCheckIn.source === "auto"
+                        ? t("glasses.autoSource")
+                        : ""}
                   </div>
                 )}
               </>
             ) : (
-              <div className="glasses-page__idle">注视画面中心的学生面部</div>
+              <div className="glasses-page__idle">{t("glasses.idleHint")}</div>
             )}
           </div>
 
           <div className="glasses-page__hint">
-            Rokid · NameFaceAI · 识别成功自动记录出勤
+            {t("glasses.footer")}
             {backendHint ? ` · ${backendHint}` : ""}
           </div>
         </>

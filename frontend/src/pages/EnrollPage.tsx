@@ -23,7 +23,8 @@ import { useNavigate } from "react-router-dom";
 import { api, type NameTagOcrResult } from "../api/client";
 import { CameraView } from "../components/CameraView";
 import { PhotoUploadZone } from "../components/PhotoUploadZone";
-import { filesToDataUrls } from "../utils/imageUpload";
+import { useI18n } from "../i18n/I18nProvider";
+import { filesToDataUrls, UploadError } from "../utils/imageUpload";
 
 function captureFrame(canvas: HTMLCanvasElement, video: HTMLVideoElement): string | null {
   if (video.readyState < 2) return null;
@@ -39,6 +40,7 @@ type EnrollMode = "camera" | "upload";
 
 export function EnrollPage() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [mode, setMode] = useState<EnrollMode>("camera");
   const [name, setName] = useState("");
   const [className, setClassName] = useState("");
@@ -82,12 +84,12 @@ export function EnrollPage() {
         const detected = result.ocr_lines.length > 0 ? result.ocr_lines.join(" / ") : result.raw_text;
         setError(
           detected
-            ? `未能识别有效姓名（检测到：${detected}）。请让名牌文字清晰、充满画面后再试`
-            : "未能识别名牌文字。请将名牌对准镜头、保证光线充足，或手动输入姓名"
+            ? t("enroll.ocrNoNameDetected", { text: detected })
+            : t("enroll.ocrNoName"),
         );
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "名牌识别失败");
+      setError(e instanceof Error ? e.message : t("enroll.ocrFailed"));
     } finally {
       setOcrLoading(false);
     }
@@ -99,7 +101,7 @@ export function EnrollPage() {
     if (!canvas || !video) return;
     const image = captureFrame(canvas, video);
     if (!image) {
-      setError("摄像头尚未就绪，请稍后再试");
+      setError(t("enroll.cameraNotReady"));
       return;
     }
     addPhotos([image]);
@@ -109,7 +111,7 @@ export function EnrollPage() {
   const recognizeLatestPhoto = async () => {
     const latest = captured[captured.length - 1];
     if (!latest) {
-      setError(mode === "upload" ? "请先上传照片" : "请先拍照，或点击「拍照并识别名牌」");
+      setError(mode === "upload" ? t("enroll.uploadFirst") : t("enroll.photoOrOcrFirst"));
       return;
     }
     await recognizeNameTag(latest);
@@ -117,11 +119,11 @@ export function EnrollPage() {
 
   const submit = async () => {
     if (!name.trim()) {
-      setError("请输入学生姓名");
+      setError(t("enroll.nameRequired"));
       return;
     }
     if (captured.length < 1) {
-      setError("请至少添加 1 张照片（拍照或上传均可，建议 3–5 张不同角度）");
+      setError(t("enroll.photosRequired"));
       return;
     }
     setLoading(true);
@@ -135,7 +137,7 @@ export function EnrollPage() {
       });
       navigate("/students");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "录入失败");
+      setError(e instanceof Error ? e.message : t("enroll.enrollFailed"));
     } finally {
       setLoading(false);
     }
@@ -150,7 +152,7 @@ export function EnrollPage() {
       if (!canvas || !video) return;
       const image = captureFrame(canvas, video);
       if (!image) {
-        setError("摄像头尚未就绪，请稍后再试");
+        setError(t("enroll.cameraNotReady"));
         return;
       }
       images = [image];
@@ -158,7 +160,7 @@ export function EnrollPage() {
     }
 
     if (images.length === 0) {
-      setError("请先拍照或上传至少 1 张照片");
+      setError(t("enroll.photoRequired"));
       return;
     }
 
@@ -173,7 +175,7 @@ export function EnrollPage() {
       });
       navigate("/students");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "名牌录入失败");
+      setError(e instanceof Error ? e.message : t("enroll.nameTagEnrollFailed"));
     } finally {
       setLoading(false);
     }
@@ -182,7 +184,7 @@ export function EnrollPage() {
   return (
     <Stack spacing={3}>
       <Alert severity="info" sx={{ borderRadius: 3 }}>
-        可通过摄像头实时拍照，或上传已有照片录入人脸。建议 3–5 张不同角度以提高识别准确率。
+        {t("enroll.info")}
       </Alert>
 
       <Card>
@@ -192,17 +194,14 @@ export function EnrollPage() {
           variant="fullWidth"
           sx={{ borderBottom: 1, borderColor: "divider" }}
         >
-          <Tab icon={<CameraAltIcon />} iconPosition="start" label="摄像头拍照" value="camera" />
-          <Tab icon={<PhotoLibraryIcon />} iconPosition="start" label="上传照片" value="upload" />
+          <Tab icon={<CameraAltIcon />} iconPosition="start" label={t("enroll.tabCamera")} value="camera" />
+          <Tab icon={<PhotoLibraryIcon />} iconPosition="start" label={t("enroll.tabUpload")} value="upload" />
         </Tabs>
         <CardContent>
           {mode === "camera" ? (
             <CameraView showOverlay={false} />
           ) : (
-            <PhotoUploadZone
-              onPhotosAdded={addPhotos}
-              disabled={loading || ocrLoading}
-            />
+            <PhotoUploadZone onPhotosAdded={addPhotos} disabled={loading || ocrLoading} />
           )}
         </CardContent>
       </Card>
@@ -210,29 +209,35 @@ export function EnrollPage() {
       <Card>
         <CardContent>
           <Stack spacing={2}>
-            <Stack direction="row" spacing={1} alignItems="center">
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
               <BadgeIcon color="primary" />
-              <Typography variant="subtitle1">名牌识别（可选）</Typography>
+              <Typography variant="subtitle1">{t("enroll.nameTagTitle")}</Typography>
             </Stack>
             <Typography variant="body2" color="text.secondary">
-              拍摄仅含姓名的牌子时，请让文字清晰居中、占满画面；若同时拍到人脸，系统会优先扫描胸牌区域。
+              {t("enroll.nameTagHint")}
             </Typography>
             {ocrResult && ocrResult.ocr_lines.length > 0 && !ocrResult.name && (
               <Typography variant="caption" color="text.secondary">
-                OCR 检测到：{ocrResult.ocr_lines.join(" / ")}
+                {t("enroll.ocrDetected", { text: ocrResult.ocr_lines.join(" / ") })}
               </Typography>
             )}
             {ocrResult?.name && (
               <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
                 <Chip
                   color="success"
-                  label={`识别：${ocrResult.name}${ocrResult.class_name ? ` · ${ocrResult.class_name}` : ""}`}
+                  label={t("enroll.ocrResult", {
+                    name: ocrResult.name,
+                    className: ocrResult.class_name ? ` · ${ocrResult.class_name}` : "",
+                  })}
                 />
-                <Chip variant="outlined" label={`置信度 ${Math.round(ocrResult.confidence * 100)}%`} />
+                <Chip
+                  variant="outlined"
+                  label={t("enroll.confidence", { pct: Math.round(ocrResult.confidence * 100) })}
+                />
                 {ocrResult.face_detected ? (
-                  <Chip variant="outlined" label="已检测到人脸" />
+                  <Chip variant="outlined" label={t("enroll.faceDetected")} />
                 ) : (
-                  <Chip variant="outlined" color="warning" label="未检测到人脸" />
+                  <Chip variant="outlined" color="warning" label={t("enroll.faceNotDetected")} />
                 )}
               </Stack>
             )}
@@ -244,7 +249,7 @@ export function EnrollPage() {
                   onClick={captureAndRecognize}
                   disabled={ocrLoading || loading}
                 >
-                  {ocrLoading ? "识别中…" : "拍照并识别名牌"}
+                  {ocrLoading ? t("enroll.ocring") : t("enroll.captureAndOcr")}
                 </Button>
               )}
               <Button
@@ -253,7 +258,11 @@ export function EnrollPage() {
                 onClick={recognizeLatestPhoto}
                 disabled={ocrLoading || loading || captured.length === 0}
               >
-                {ocrLoading ? "识别中…" : mode === "upload" ? "识别最新上传照片" : "重新识别最新照片"}
+                {ocrLoading
+                  ? t("enroll.ocring")
+                  : mode === "upload"
+                    ? t("enroll.ocrLatestUpload")
+                    : t("enroll.ocrLatestPhoto")}
               </Button>
               <Button
                 variant="outlined"
@@ -261,7 +270,7 @@ export function EnrollPage() {
                 onClick={submitFromNameTag}
                 disabled={loading || ocrLoading}
               >
-                {loading ? "录入中…" : "名牌一键录入"}
+                {loading ? t("enroll.enrolling") : t("enroll.nameTagEnroll")}
               </Button>
             </Stack>
           </Stack>
@@ -271,9 +280,28 @@ export function EnrollPage() {
       <Card>
         <CardContent>
           <Stack spacing={2.5}>
-            <TextField label="姓名" required fullWidth value={name} onChange={(e) => setName(e.target.value)} />
-            <TextField label="班级" fullWidth placeholder="如：三班" value={className} onChange={(e) => setClassName(e.target.value)} />
-            <TextField label="备注" fullWidth multiline rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <TextField
+              label={t("common.name")}
+              required
+              fullWidth
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <TextField
+              label={t("common.className")}
+              fullWidth
+              placeholder={t("enroll.classPlaceholder")}
+              value={className}
+              onChange={(e) => setClassName(e.target.value)}
+            />
+            <TextField
+              label={t("common.notes")}
+              fullWidth
+              multiline
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
           </Stack>
         </CardContent>
       </Card>
@@ -284,17 +312,29 @@ export function EnrollPage() {
         <Card>
           <CardContent>
             <Typography variant="subtitle2" gutterBottom color="text.secondary">
-              已选 {captured.length} 张
+              {t("enroll.selectedPhotos", { count: captured.length })}
             </Typography>
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 1.5 }}>
               {captured.map((img, i) => (
                 <Box key={i}>
                   <Box sx={{ position: "relative", borderRadius: 2, overflow: "hidden" }}>
-                    <Box component="img" src={img} alt={`照片 ${i + 1}`} sx={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
+                    <Box
+                      component="img"
+                      src={img}
+                      alt={t("enroll.photoAlt", { n: i + 1 })}
+                      sx={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }}
+                    />
                     <IconButton
                       size="small"
                       onClick={() => setCaptured((p) => p.filter((_, j) => j !== i))}
-                      sx={{ position: "absolute", top: 4, right: 4, bgcolor: "rgba(0,0,0,0.5)", color: "#fff", "&:hover": { bgcolor: "rgba(0,0,0,0.7)" } }}
+                      sx={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        bgcolor: "rgba(0,0,0,0.5)",
+                        color: "#fff",
+                        "&:hover": { bgcolor: "rgba(0,0,0,0.7)" },
+                      }}
                     >
                       <DeleteIcon fontSize="small" />
                     </IconButton>
@@ -309,7 +349,7 @@ export function EnrollPage() {
       <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1.5 }}>
         {mode === "camera" && (
           <Button variant="outlined" startIcon={<CameraAltIcon />} onClick={capturePhoto} size="large">
-            拍照 ({captured.length})
+            {t("enroll.capturePhoto", { count: captured.length })}
           </Button>
         )}
         {mode === "upload" && (
@@ -319,14 +359,14 @@ export function EnrollPage() {
             onClick={() => document.getElementById("enroll-upload-more")?.click()}
             size="large"
           >
-            继续上传
+            {t("enroll.uploadMore")}
           </Button>
         )}
         <Button variant="contained" startIcon={<SaveIcon />} onClick={submit} disabled={loading} size="large">
-          {loading ? "保存中…" : "保存"}
+          {loading ? t("enroll.saving") : t("common.save")}
         </Button>
         <Button variant="text" startIcon={<CloseIcon />} onClick={() => navigate("/")}>
-          取消
+          {t("common.cancel")}
         </Button>
       </Stack>
 
@@ -342,7 +382,13 @@ export function EnrollPage() {
             if (!files) return;
             void filesToDataUrls(files)
               .then(addPhotos)
-              .catch((err) => setError(err instanceof Error ? err.message : "上传失败"))
+              .catch((err) => {
+                if (err instanceof UploadError) {
+                  setError(t(err.i18nKey, err.i18nParams));
+                } else {
+                  setError(t("enroll.uploadFailed"));
+                }
+              })
               .finally(() => {
                 e.target.value = "";
               });

@@ -12,27 +12,30 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
+import { useI18n } from "../i18n/I18nProvider";
+import { en } from "../i18n/locales/en";
+import { zh } from "../i18n/locales/zh";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
-const SUGGESTIONS = [
-  "帮我为每位学生生成一个姓名记忆口诀",
-  "列出还没有录入人脸的学生",
-  "总结一下当前班级学生情况",
-];
-
 export function AssistantPage() {
+  const { t, locale } = useI18n();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [llmAvailable, setLlmAvailable] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const suggestions = useMemo(
+    () => (locale === "zh" ? zh.assistant.suggestions : en.assistant.suggestions),
+    [locale],
+  );
 
   useEffect(() => {
     api.health().then((h) => setLlmAvailable(h.llm_provider));
@@ -54,7 +57,7 @@ export function AssistantPage() {
       const resp = await api.chat(next.map((m) => ({ role: m.role, content: m.content })));
       setMessages([...next, { role: "assistant", content: resp.reply }]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "请求失败");
+      setError(e instanceof Error ? e.message : t("assistant.requestFailed"));
     } finally {
       setLoading(false);
     }
@@ -64,13 +67,17 @@ export function AssistantPage() {
     <Stack spacing={2} sx={{ height: { md: "calc(100vh - 160px)" }, minHeight: 480 }}>
       {!llmAvailable && (
         <Alert severity="info" sx={{ borderRadius: 3 }}>
-          LLM 未配置。在 <code>backend/.env</code> 中设置{" "}
-          <code>LLM_PROVIDER=dashscope|deepseek|ollama</code>
+          {t("assistant.llmNotConfigured")}
         </Alert>
       )}
 
       {llmAvailable && (
-        <Chip icon={<SmartToyOutlinedIcon />} label={`Provider: ${llmAvailable}`} variant="outlined" sx={{ alignSelf: "flex-start" }} />
+        <Chip
+          icon={<SmartToyOutlinedIcon />}
+          label={`${t("common.provider")}: ${llmAvailable}`}
+          variant="outlined"
+          sx={{ alignSelf: "flex-start" }}
+        />
       )}
 
       <Card sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 360 }}>
@@ -78,10 +85,17 @@ export function AssistantPage() {
           {messages.length === 0 && (
             <Stack spacing={1} sx={{ alignItems: "flex-start" }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                试试这些问题：
+                {t("assistant.tryThese")}
               </Typography>
-              {SUGGESTIONS.map((s) => (
-                <Chip key={s} label={s} onClick={() => send(s)} clickable variant="outlined" sx={{ height: "auto", py: 1, "& .MuiChip-label": { whiteSpace: "normal" } }} />
+              {suggestions.map((s) => (
+                <Chip
+                  key={s}
+                  label={s}
+                  onClick={() => send(s)}
+                  clickable
+                  variant="outlined"
+                  sx={{ height: "auto", py: 1, "& .MuiChip-label": { whiteSpace: "normal" } }}
+                />
               ))}
             </Stack>
           )}
@@ -109,7 +123,7 @@ export function AssistantPage() {
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <CircularProgress size={20} />
                 <Typography variant="body2" color="text.secondary">
-                  思考中…
+                  {t("assistant.thinking")}
                 </Typography>
               </Box>
             )}
@@ -133,14 +147,24 @@ export function AssistantPage() {
         >
           <TextField
             fullWidth
-            placeholder="输入问题，如：帮我记住张三的脸…"
+            placeholder={t("assistant.placeholder")}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={loading}
             size="small"
             sx={{ "& .MuiOutlinedInput-root": { borderRadius: 6 } }}
           />
-          <IconButton type="submit" color="primary" disabled={loading || !input.trim()} sx={{ bgcolor: "primary.main", color: "#fff", "&:hover": { bgcolor: "primary.dark" }, "&.Mui-disabled": { bgcolor: "action.disabledBackground" } }}>
+          <IconButton
+            type="submit"
+            color="primary"
+            disabled={loading || !input.trim()}
+            sx={{
+              bgcolor: "primary.main",
+              color: "#fff",
+              "&:hover": { bgcolor: "primary.dark" },
+              "&.Mui-disabled": { bgcolor: "action.disabledBackground" },
+            }}
+          >
             <SendIcon />
           </IconButton>
         </Box>

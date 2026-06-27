@@ -35,9 +35,11 @@ import { useNavigate } from "react-router-dom";
 import { api, type Student } from "../api/client";
 import { CameraView } from "../components/CameraView";
 import { PhotoUploadZone } from "../components/PhotoUploadZone";
+import { useI18n } from "../i18n/I18nProvider";
 
 export function StudentsPage() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,17 +71,17 @@ export function StudentsPage() {
       setEditing(null);
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "更新失败");
+      setError(e instanceof Error ? e.message : t("students.updateFailed"));
     }
   };
 
   const deleteStudent = async (id: number) => {
-    if (!confirm("确定删除该学生？")) return;
+    if (!confirm(t("students.confirmDelete"))) return;
     try {
       await api.deleteStudent(id);
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "删除失败");
+      setError(e instanceof Error ? e.message : t("students.deleteFailed"));
     }
   };
 
@@ -106,7 +108,7 @@ export function StudentsPage() {
       setCaptured([]);
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "重新录入失败");
+      setError(e instanceof Error ? e.message : t("students.reenrollFailed"));
     }
   };
 
@@ -114,7 +116,7 @@ export function StudentsPage() {
     <Stack spacing={3}>
       <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate("/enroll")}>
-          录入新学生
+          {t("students.enrollNew")}
         </Button>
       </Stack>
 
@@ -128,10 +130,10 @@ export function StudentsPage() {
         <Card sx={{ textAlign: "center", py: 6 }}>
           <FaceIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
           <Typography color="text.secondary" gutterBottom>
-            暂无学生
+            {t("students.empty")}
           </Typography>
           <Button variant="outlined" onClick={() => navigate("/enroll")}>
-            去录入
+            {t("students.goEnroll")}
           </Button>
         </Card>
       ) : (
@@ -139,11 +141,11 @@ export function StudentsPage() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>姓名</TableCell>
-                <TableCell>班级</TableCell>
-                <TableCell align="center">人脸数</TableCell>
-                <TableCell>备注</TableCell>
-                <TableCell align="right">操作</TableCell>
+                <TableCell>{t("common.name")}</TableCell>
+                <TableCell>{t("common.className")}</TableCell>
+                <TableCell align="center">{t("students.faceCount")}</TableCell>
+                <TableCell>{t("common.notes")}</TableCell>
+                <TableCell align="right">{t("common.actions")}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -154,23 +156,34 @@ export function StudentsPage() {
                   </TableCell>
                   <TableCell>{s.class_name || "—"}</TableCell>
                   <TableCell align="center">
-                    <Chip label={s.face_count} size="small" color={s.face_count > 0 ? "success" : "default"} variant="outlined" />
+                    <Chip
+                      label={s.face_count}
+                      size="small"
+                      color={s.face_count > 0 ? "success" : "default"}
+                      variant="outlined"
+                    />
                   </TableCell>
                   <TableCell sx={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {s.notes || "—"}
                   </TableCell>
                   <TableCell align="right">
-                    <Tooltip title="编辑">
+                    <Tooltip title={t("common.edit")}>
                       <IconButton size="small" onClick={() => setEditing({ ...s })}>
                         <EditIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="重录人脸">
-                      <IconButton size="small" onClick={() => { setReenrolling(s); setCaptured([]); }}>
+                    <Tooltip title={t("students.reenrollFace")}>
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          setReenrolling(s);
+                          setCaptured([]);
+                        }}
+                      >
                         <RefreshIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="删除">
+                    <Tooltip title={t("common.delete")}>
                       <IconButton size="small" color="error" onClick={() => deleteStudent(s.id)}>
                         <DeleteIcon fontSize="small" />
                       </IconButton>
@@ -184,24 +197,50 @@ export function StudentsPage() {
       )}
 
       <Dialog open={!!editing} onClose={() => setEditing(null)} fullWidth maxWidth="sm">
-        <DialogTitle>编辑学生</DialogTitle>
+        <DialogTitle>{t("students.editStudent")}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
-            <TextField label="姓名" fullWidth value={editing?.name ?? ""} onChange={(e) => setEditing((p) => p && { ...p, name: e.target.value })} />
-            <TextField label="班级" fullWidth value={editing?.class_name ?? ""} onChange={(e) => setEditing((p) => p && { ...p, class_name: e.target.value })} />
-            <TextField label="备注" fullWidth multiline rows={3} value={editing?.notes ?? ""} onChange={(e) => setEditing((p) => p && { ...p, notes: e.target.value })} />
+            <TextField
+              label={t("common.name")}
+              fullWidth
+              value={editing?.name ?? ""}
+              onChange={(e) => setEditing((p) => p && { ...p, name: e.target.value })}
+            />
+            <TextField
+              label={t("common.className")}
+              fullWidth
+              value={editing?.class_name ?? ""}
+              onChange={(e) => setEditing((p) => p && { ...p, class_name: e.target.value })}
+            />
+            <TextField
+              label={t("common.notes")}
+              fullWidth
+              multiline
+              rows={3}
+              value={editing?.notes ?? ""}
+              onChange={(e) => setEditing((p) => p && { ...p, notes: e.target.value })}
+            />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setEditing(null)}>取消</Button>
+          <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
           <Button variant="contained" onClick={saveEdit}>
-            保存
+            {t("common.save")}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={!!reenrolling} onClose={() => { setReenrolling(null); setCaptured([]); setReenrollMode("camera"); }} fullWidth maxWidth="md">
-        <DialogTitle>重新录入人脸 — {reenrolling?.name}</DialogTitle>
+      <Dialog
+        open={!!reenrolling}
+        onClose={() => {
+          setReenrolling(null);
+          setCaptured([]);
+          setReenrollMode("camera");
+        }}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>{t("students.reenrollTitle", { name: reenrolling?.name ?? "" })}</DialogTitle>
         <DialogContent>
           <Stack spacing={2}>
             <Tabs
@@ -209,8 +248,8 @@ export function StudentsPage() {
               onChange={(_, value: "camera" | "upload") => setReenrollMode(value)}
               variant="fullWidth"
             >
-              <Tab icon={<CameraAltIcon />} iconPosition="start" label="摄像头" value="camera" />
-              <Tab icon={<PhotoLibraryIcon />} iconPosition="start" label="上传照片" value="upload" />
+              <Tab icon={<CameraAltIcon />} iconPosition="start" label={t("students.tabCamera")} value="camera" />
+              <Tab icon={<PhotoLibraryIcon />} iconPosition="start" label={t("students.tabUpload")} value="upload" />
             </Tabs>
             {reenrollMode === "camera" ? (
               <CameraView showOverlay={false} />
@@ -220,7 +259,13 @@ export function StudentsPage() {
             {captured.length > 0 && (
               <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
                 {captured.map((img, i) => (
-                  <Box key={i} component="img" src={img} alt={`capture ${i + 1}`} sx={{ width: 80, height: 80, objectFit: "cover", borderRadius: 2 }} />
+                  <Box
+                    key={i}
+                    component="img"
+                    src={img}
+                    alt={`capture ${i + 1}`}
+                    sx={{ width: 80, height: 80, objectFit: "cover", borderRadius: 2 }}
+                  />
                 ))}
               </Stack>
             )}
@@ -229,13 +274,21 @@ export function StudentsPage() {
         <DialogActions sx={{ px: 3, pb: 2 }}>
           {reenrollMode === "camera" && (
             <Button startIcon={<CameraAltIcon />} onClick={capturePhoto}>
-              拍照 ({captured.length})
+              {t("students.capturePhoto", { count: captured.length })}
             </Button>
           )}
           <Box sx={{ flex: 1 }} />
-          <Button onClick={() => { setReenrolling(null); setCaptured([]); setReenrollMode("camera"); }}>取消</Button>
+          <Button
+            onClick={() => {
+              setReenrolling(null);
+              setCaptured([]);
+              setReenrollMode("camera");
+            }}
+          >
+            {t("common.cancel")}
+          </Button>
           <Button variant="contained" onClick={submitReenroll} disabled={captured.length === 0}>
-            提交
+            {t("common.submit")}
           </Button>
         </DialogActions>
       </Dialog>

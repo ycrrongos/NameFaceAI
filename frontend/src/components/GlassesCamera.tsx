@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FaceMatch } from "../api/client";
-import { getCameraErrorMessage, isSecureEnoughForCamera, mapFaceBboxToOverlay, openCameraStream } from "../utils/cameraUtils";
 import { isRokidWebView } from "../config/runtime";
+import { useI18n } from "../i18n/I18nProvider";
+import {
+  getCameraErrorRef,
+  isSecureEnoughForCamera,
+  mapFaceBboxToOverlay,
+  openCameraStream,
+  type CameraErrorRef,
+} from "../utils/cameraUtils";
 
 interface GlassesCameraProps {
   onFrame?: (jpeg: ArrayBuffer) => void;
@@ -24,6 +31,7 @@ export function GlassesCamera({
   hideVideo = false,
   autoStart = false,
 }: GlassesCameraProps) {
+  const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -31,12 +39,15 @@ export function GlassesCamera({
   const captureSizeRef = useRef({ width: 0, height: 0 });
   const encodingRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
-  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraErrorRef, setCameraErrorRef] = useState<CameraErrorRef | null>(null);
   const [starting, setStarting] = useState(false);
   const [active, setActive] = useState(false);
 
+  const cameraError = cameraErrorRef ? t(cameraErrorRef.key, cameraErrorRef.params) : null;
+  const { hostname, port } = window.location;
+
   const stopStream = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setActive(false);
@@ -45,20 +56,17 @@ export function GlassesCamera({
   const startCamera = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       const insecure = typeof window !== "undefined" && window.location.protocol === "http:";
-      setCameraError(
-        insecure && isRokidWebView()
-          ? "HTTP 无法调用摄像头，请等待 App 自动切换到 HTTPS"
-          : "不支持摄像头",
-      );
+      setCameraErrorRef({
+        key: insecure && isRokidWebView() ? "glasses.cameraHttpWait" : "glasses.cameraUnsupported",
+      });
       return;
     }
     if (!isSecureEnoughForCamera()) {
-      const { hostname, port } = window.location;
-      setCameraError(`请用 https://${hostname}:${port}/rokid 打开`);
+      setCameraErrorRef({ key: "glasses.cameraOpenHttps", params: { hostname, port } });
       return;
     }
     setStarting(true);
-    setCameraError(null);
+    setCameraErrorRef(null);
     stopStream();
     try {
       const stream = await openCameraStream();
@@ -72,21 +80,21 @@ export function GlassesCamera({
       setActive(true);
     } catch (err) {
       stopStream();
-      setCameraError(getCameraErrorMessage(err));
+      setCameraErrorRef(getCameraErrorRef(err));
     } finally {
       setStarting(false);
     }
-  }, [stopStream]);
+  }, [hostname, port, stopStream]);
 
   useEffect(() => {
     return () => stopStream();
   }, [stopStream]);
 
   useEffect(() => {
-    if (autoStart && !active && !starting && !cameraError) {
+    if (autoStart && !active && !starting && !cameraErrorRef) {
       void startCamera();
     }
-  }, [autoStart, active, starting, cameraError, startCamera]);
+  }, [autoStart, active, starting, cameraErrorRef, startCamera]);
 
   useEffect(() => {
     if (!active || !onFrame) return;
@@ -189,12 +197,12 @@ export function GlassesCamera({
         <div className="glasses-camera__start">
           {!isSecureEnoughForCamera() && (
             <p className="glasses-camera__hint">
-              请使用 https://{window.location.hostname}:{window.location.port}/rokid
+              {t("glasses.cameraUseHttps", { hostname, port })}
             </p>
           )}
           {cameraError && <p className="glasses-camera__hint glasses-camera__hint--error">{cameraError}</p>}
           <button type="button" className="glasses-camera__start-btn" disabled={starting} onClick={() => void startCamera()}>
-            {starting ? "开启中…" : "开启摄像头"}
+            {starting ? t("glasses.cameraStarting") : t("glasses.cameraStart")}
           </button>
         </div>
       )}

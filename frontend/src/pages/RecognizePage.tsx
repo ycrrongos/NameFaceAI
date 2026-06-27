@@ -17,10 +17,12 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { CameraView } from "../components/CameraView";
 import { getPhoneCameraStreamUrl } from "../config/runtime";
+import { useI18n } from "../i18n/I18nProvider";
 import { useRecognizeWebSocket } from "../hooks/useWebSocket";
 
 export function RecognizePage() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [fps, setFps] = useState(10);
   const [gpuMode, setGpuMode] = useState(false);
   const [health, setHealth] = useState<string>("");
@@ -29,7 +31,11 @@ export function RecognizePage() {
   useEffect(() => {
     api.health().then((h) => {
       const accel =
-        h.accelerator === "gpu" ? "独显" : h.accelerator === "igpu" ? "集显" : "CPU";
+        h.accelerator === "gpu"
+          ? t("recognize.accelGpu")
+          : h.accelerator === "igpu"
+            ? t("recognize.accelIgpu")
+            : t("recognize.accelCpu");
       setGpuMode(h.gpu);
       setHealth(`${accel} · ${h.provider}`);
       if (h.gpu) setFps(12);
@@ -38,7 +44,7 @@ export function RecognizePage() {
         setFps(Math.min(5, Math.max(1, Math.round(1000 / interval))));
       }
     });
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (inferenceMs == null) return;
@@ -58,19 +64,27 @@ export function RecognizePage() {
           <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
             <Chip
               icon={connected ? <WifiIcon /> : <WifiOffIcon />}
-              label={connected ? "已连接" : "连接中…"}
+              label={connected ? t("recognize.connected") : t("recognize.connecting")}
               color={connected ? "success" : "default"}
               variant="outlined"
             />
-            <Chip icon={<MemoryIcon />} label={health || "加载中…"} variant="outlined" />
+            <Chip icon={<MemoryIcon />} label={health || t("common.loading")} variant="outlined" />
             {inferenceMs != null && (
-              <Chip icon={<SpeedIcon />} label={`推理 ${inferenceMs.toFixed(0)} ms`} variant="outlined" />
+              <Chip
+                icon={<SpeedIcon />}
+                label={t("recognize.inferenceMs", { ms: inferenceMs.toFixed(0) })}
+                variant="outlined"
+              />
             )}
             {faces.length > 0 && (
-              <Chip label={`检测到 ${faces.length} 张人脸`} color="primary" variant="outlined" />
+              <Chip
+                label={t("recognize.facesDetected", { count: faces.length })}
+                color="primary"
+                variant="outlined"
+              />
             )}
             {attendance.filter((a) => a.newly_marked).map((a) => (
-              <Chip key={a.student_id} label={`${a.name} 已自动打卡`} color="success" />
+              <Chip key={a.student_id} label={t("recognize.autoCheckIn", { name: a.name })} color="success" />
             ))}
           </Stack>
         </CardContent>
@@ -89,7 +103,7 @@ export function RecognizePage() {
 
       <Box>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate("/enroll")} size="large">
-          录入新学生
+          {t("recognize.enrollNew")}
         </Button>
       </Box>
     </Stack>

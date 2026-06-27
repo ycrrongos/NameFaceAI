@@ -1,7 +1,8 @@
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { useRef, useState } from "react";
-import { filesToDataUrls, UPLOAD_ACCEPT } from "../utils/imageUpload";
+import { useI18n } from "../i18n/I18nProvider";
+import { filesToDataUrls, UploadError, UPLOAD_ACCEPT } from "../utils/imageUpload";
 
 interface PhotoUploadZoneProps {
   onPhotosAdded: (dataUrls: string[]) => void;
@@ -14,6 +15,7 @@ export function PhotoUploadZone({
   disabled = false,
   multiple = true,
 }: PhotoUploadZoneProps) {
+  const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -27,7 +29,11 @@ export function PhotoUploadZone({
       const dataUrls = await filesToDataUrls(files);
       if (dataUrls.length > 0) onPhotosAdded(dataUrls);
     } catch (e) {
-      setLocalError(e instanceof Error ? e.message : "上传失败");
+      if (e instanceof UploadError) {
+        setLocalError(t(e.i18nKey, e.i18nParams));
+      } else {
+        setLocalError(t("upload.failed"));
+      }
     } finally {
       setLoading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -62,10 +68,10 @@ export function PhotoUploadZone({
       >
         <CloudUploadIcon sx={{ fontSize: 40, color: "primary.main", mb: 1 }} />
         <Typography variant="subtitle1" gutterBottom>
-          拖拽照片到此处，或点击选择文件
+          {t("upload.dragHint")}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          支持 JPG、PNG、WebP，可一次选择多张。建议上传 3–5 张不同角度的清晰人脸照片。
+          {t("upload.formatHint")}
         </Typography>
         <Button
           variant="contained"
@@ -73,7 +79,7 @@ export function PhotoUploadZone({
           disabled={disabled || loading}
           onClick={() => inputRef.current?.click()}
         >
-          {loading ? "处理中…" : "选择照片"}
+          {loading ? t("upload.processing") : t("upload.selectPhotos")}
         </Button>
         <input
           ref={inputRef}

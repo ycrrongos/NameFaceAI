@@ -4,11 +4,23 @@ const JPEG_QUALITY = 0.85;
 
 export const UPLOAD_ACCEPT = "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp";
 
+export class UploadError extends Error {
+  i18nKey: string;
+  i18nParams?: Record<string, string | number>;
+
+  constructor(i18nKey: string, i18nParams?: Record<string, string | number>) {
+    super(i18nKey);
+    this.name = "UploadError";
+    this.i18nKey = i18nKey;
+    this.i18nParams = i18nParams;
+  }
+}
+
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("无法读取图片"));
+    img.onerror = () => reject(new UploadError("upload.readFailed"));
     img.src = url;
   });
 }
@@ -26,14 +38,14 @@ function resizeToJpegDataUrl(img: HTMLImageElement): string {
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("无法处理图片");
+  if (!ctx) throw new UploadError("upload.processFailed");
   ctx.drawImage(img, 0, 0, width, height);
   return canvas.toDataURL("image/jpeg", JPEG_QUALITY);
 }
 
 export async function fileToDataUrl(file: File): Promise<string> {
   if (!ACCEPTED_TYPES.has(file.type)) {
-    throw new Error(`不支持的格式：${file.name}（请使用 JPG、PNG 或 WebP）`);
+    throw new UploadError("upload.unsupportedFormat", { name: file.name });
   }
   const objectUrl = URL.createObjectURL(file);
   try {
@@ -47,18 +59,22 @@ export async function fileToDataUrl(file: File): Promise<string> {
 export async function filesToDataUrls(files: FileList | File[]): Promise<string[]> {
   const list = Array.from(files);
   const results: string[] = [];
-  const errors: string[] = [];
+  const errors: UploadError[] = [];
 
   for (const file of list) {
     try {
       results.push(await fileToDataUrl(file));
     } catch (e) {
-      errors.push(e instanceof Error ? e.message : `${file.name} 处理失败`);
+      errors.push(
+        e instanceof UploadError
+          ? e
+          : new UploadError("upload.fileFailed", { name: file.name }),
+      );
     }
   }
 
   if (results.length === 0 && errors.length > 0) {
-    throw new Error(errors.join("；"));
+    throw errors[0];
   }
   return results;
 }
