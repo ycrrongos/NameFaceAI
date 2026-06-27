@@ -1,6 +1,8 @@
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import EventNoteIcon from "@mui/icons-material/EventNote";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import TextSnippetIcon from "@mui/icons-material/TextSnippet";
 import {
   Alert,
   Box,
@@ -27,6 +29,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type AttendanceSheet, type AttendanceStatus } from "../api/client";
 import { useI18n } from "../i18n/I18nProvider";
+import { exportAttendanceMarkdown, exportAttendancePdf } from "../utils/attendanceExport";
 
 function todayString(): string {
   const d = new Date();
@@ -50,6 +53,39 @@ export function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<"md" | "pdf" | null>(null);
+
+  const exportLabels = useMemo(
+    () => ({
+      title: t("attendance.exportTitle"),
+      dateLabel: t("attendance.date"),
+      classLabel: t("attendance.classFilter"),
+      allClasses: t("common.all"),
+      summaryTitle: t("attendance.summaryTitle"),
+      detailTitle: t("attendance.detailTitle"),
+      name: t("common.name"),
+      className: t("common.className"),
+      status: t("attendance.status"),
+      source: t("attendance.source"),
+      markedAt: t("attendance.markedAt"),
+      total: t("attendance.summaryTotal"),
+      present: t("attendance.summaryPresent"),
+      absent: t("attendance.summaryAbsent"),
+      late: t("attendance.summaryLate"),
+      excused: t("attendance.summaryExcused"),
+      unmarked: t("attendance.summaryUnmarked"),
+      statusLabels: {
+        present: t("attendance.statusPresent"),
+        absent: t("attendance.statusAbsent"),
+        late: t("attendance.statusLate"),
+        excused: t("attendance.statusExcused"),
+      },
+      sourceAuto: t("attendance.sourceAuto"),
+      sourceManual: t("attendance.sourceManual"),
+      none: "—",
+    }),
+    [t],
+  );
 
   const formatTime = (iso: string | null) => {
     if (!iso) return "—";
@@ -81,6 +117,41 @@ export function AttendancePage() {
     if (!q) return sheet.rows;
     return sheet.rows.filter((r) => r.name.toLowerCase().includes(q));
   }, [sheet, search]);
+
+  const buildExportOptions = () => {
+    if (!sheet || filteredRows.length === 0) return null;
+    return {
+      sheet,
+      rows: filteredRows,
+      classFilter,
+      labels: exportLabels,
+      formatTime,
+    };
+  };
+
+  const handleExportMarkdown = () => {
+    const options = buildExportOptions();
+    if (!options) return;
+    try {
+      exportAttendanceMarkdown(options);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("attendance.exportFailed"));
+    }
+  };
+
+  const handleExportPdf = async () => {
+    const options = buildExportOptions();
+    if (!options) return;
+    setExporting("pdf");
+    setError(null);
+    try {
+      await exportAttendancePdf(options);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("attendance.exportFailed"));
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const markStatus = async (studentId: number, status: AttendanceStatus) => {
     setSavingId(studentId);
@@ -169,6 +240,22 @@ export function AttendancePage() {
               </Button>
               <Button variant="outlined" color="error" onClick={() => markAll("absent")} disabled={loading}>
                 {t("attendance.markAllAbsent")}
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<TextSnippetIcon />}
+                onClick={handleExportMarkdown}
+                disabled={loading || !sheet || filteredRows.length === 0}
+              >
+                {t("attendance.exportMarkdown")}
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<PictureAsPdfIcon />}
+                onClick={() => void handleExportPdf()}
+                disabled={loading || exporting === "pdf" || !sheet || filteredRows.length === 0}
+              >
+                {exporting === "pdf" ? t("common.loading") : t("attendance.exportPdf")}
               </Button>
             </Stack>
           </Stack>

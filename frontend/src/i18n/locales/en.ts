@@ -122,6 +122,18 @@ export const en: TranslationDict = {
     statusAbsent: "Absent",
     statusLate: "Late",
     statusExcused: "Excused",
+    exportMarkdown: "Export Markdown",
+    exportPdf: "Export PDF",
+    exportFailed: "Export failed",
+    exportTitle: "Attendance sheet",
+    summaryTitle: "Summary",
+    detailTitle: "Details",
+    summaryTotal: "Total",
+    summaryPresent: "Present",
+    summaryAbsent: "Absent",
+    summaryLate: "Late",
+    summaryExcused: "Excused",
+    summaryUnmarked: "Unmarked",
   },
   assistant: {
     llmNotConfigured:

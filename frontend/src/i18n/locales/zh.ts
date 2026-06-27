@@ -119,6 +119,18 @@ export const zh = {
     statusAbsent: "缺勤",
     statusLate: "迟到",
     statusExcused: "请假",
+    exportMarkdown: "导出 Markdown",
+    exportPdf: "导出 PDF",
+    exportFailed: "导出失败",
+    exportTitle: "考勤表",
+    summaryTitle: "汇总",
+    detailTitle: "明细",
+    summaryTotal: "共",
+    summaryPresent: "出勤",
+    summaryAbsent: "缺勤",
+    summaryLate: "迟到",
+    summaryExcused: "请假",
+    summaryUnmarked: "未标记",
   },
   assistant: {
     llmNotConfigured:
