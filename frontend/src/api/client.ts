@@ -40,6 +40,33 @@ export interface NameTagOcrResult {
   face_bbox: number[] | null;
 }
 
+export type AttendanceStatus = "present" | "absent" | "late" | "excused";
+
+export interface AttendanceRow {
+  student_id: number;
+  name: string;
+  class_name: string | null;
+  status: AttendanceStatus | null;
+  source: "manual" | "auto" | null;
+  notes: string | null;
+  marked_at: string | null;
+}
+
+export interface AttendanceSummary {
+  total: number;
+  present: number;
+  absent: number;
+  late: number;
+  excused: number;
+  unmarked: number;
+}
+
+export interface AttendanceSheet {
+  date: string;
+  rows: AttendanceRow[];
+  summary: AttendanceSummary;
+}
+
 function apiBase(): string {
   return getApiBase();
 }
@@ -104,6 +131,26 @@ export const api = {
     notes?: string;
   }) =>
     request<Student>("/api/ocr/enroll-nametag", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getAttendanceSheet: (date: string, class_name?: string) => {
+    const params = new URLSearchParams({ date });
+    if (class_name) params.set("class_name", class_name);
+    return request<AttendanceSheet>(`/api/attendance?${params}`);
+  },
+  markAttendance: (data: {
+    student_id: number;
+    date: string;
+    status: AttendanceStatus;
+    notes?: string;
+  }) =>
+    request<AttendanceSheet>("/api/attendance/mark", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  markAllAttendance: (data: { date: string; status: AttendanceStatus }) =>
+    request<AttendanceSheet>("/api/attendance/mark-all", {
       method: "POST",
       body: JSON.stringify(data),
     }),

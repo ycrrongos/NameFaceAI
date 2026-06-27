@@ -11,6 +11,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AppLayout } from "./layout/AppLayout.tsx";
 import { AssistantPage } from "./pages/AssistantPage.tsx";
+import { AttendancePage } from "./pages/AttendancePage.tsx";
 import { EnrollPage } from "./pages/EnrollPage.tsx";
 import { GlassesPage } from "./pages/GlassesPage.tsx";
 import { RecognizePage } from "./pages/RecognizePage.tsx";
@@ -31,6 +32,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/recognize" element={<RecognizePage />} />
             <Route path="/enroll" element={<EnrollPage />} />
             <Route path="/students" element={<StudentsPage />} />
+            <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/assistant" element={<AssistantPage />} />
           </Route>
         </Routes>

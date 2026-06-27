@@ -2,6 +2,7 @@ import BadgeIcon from "@mui/icons-material/Badge";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
+import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
 import SaveIcon from "@mui/icons-material/Save";
 import {
   Alert,
@@ -12,6 +13,8 @@ import {
   Chip,
   IconButton,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
@@ -19,6 +22,8 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type NameTagOcrResult } from "../api/client";
 import { CameraView } from "../components/CameraView";
+import { PhotoUploadZone } from "../components/PhotoUploadZone";
+import { filesToDataUrls } from "../utils/imageUpload";
 
 function captureFrame(canvas: HTMLCanvasElement, video: HTMLVideoElement): string | null {
   if (video.readyState < 2) return null;
@@ -30,8 +35,11 @@ function captureFrame(canvas: HTMLCanvasElement, video: HTMLVideoElement): strin
   return canvas.toDataURL("image/jpeg", 0.85);
 }
 
+type EnrollMode = "camera" | "upload";
+
 export function EnrollPage() {
   const navigate = useNavigate();
+  const [mode, setMode] = useState<EnrollMode>("camera");
   const [name, setName] = useState("");
   const [className, setClassName] = useState("");
   const [notes, setNotes] = useState("");
@@ -44,14 +52,18 @@ export function EnrollPage() {
 
   const getVideo = () => document.querySelector("video") as HTMLVideoElement | null;
 
+  const addPhotos = (images: string[]) => {
+    setCaptured((prev) => [...prev, ...images]);
+    setOcrResult(null);
+  };
+
   const capturePhoto = () => {
     const canvas = previewRef.current;
     const video = getVideo();
     if (!canvas || !video) return;
     const image = captureFrame(canvas, video);
     if (!image) return;
-    setCaptured((prev) => [...prev, image]);
-    setOcrResult(null);
+    addPhotos([image]);
   };
 
   const applyOcrResult = (result: NameTagOcrResult) => {
@@ -89,14 +101,14 @@ export function EnrollPage() {
       setError("摄像头尚未就绪，请稍后再试");
       return;
     }
-    setCaptured((prev) => [...prev, image]);
+    addPhotos([image]);
     await recognizeNameTag(image);
   };
 
   const recognizeLatestPhoto = async () => {
     const latest = captured[captured.length - 1];
     if (!latest) {
-      setError("请先拍照，或点击「拍照并识别名牌」");
+      setError(mode === "upload" ? "请先上传照片" : "请先拍照，或点击「拍照并识别名牌」");
       return;
     }
     await recognizeNameTag(latest);
@@ -108,7 +120,7 @@ export function EnrollPage() {
       return;
     }
     if (captured.length < 1) {
-      setError("请至少拍摄 1 张照片（建议 3–5 张不同角度）");
+      setError("请至少添加 1 张照片（拍照或上传均可，建议 3–5 张不同角度）");
       return;
     }
     setLoading(true);
@@ -129,12 +141,12 @@ export function EnrollPage() {
   };
 
   const submitFromNameTag = async () => {
-    const canvas = previewRef.current;
-    const video = getVideo();
-    if (!canvas || !video) return;
-
     let images = captured;
-    if (images.length === 0) {
+
+    if (images.length === 0 && mode === "camera") {
+      const canvas = previewRef.current;
+      const video = getVideo();
+      if (!canvas || !video) return;
       const image = captureFrame(canvas, video);
       if (!image) {
         setError("摄像头尚未就绪，请稍后再试");
@@ -142,6 +154,11 @@ export function EnrollPage() {
       }
       images = [image];
       setCaptured([image]);
+    }
+
+    if (images.length === 0) {
+      setError("请先拍照或上传至少 1 张照片");
+      return;
     }
 
     setLoading(true);
@@ -164,20 +181,40 @@ export function EnrollPage() {
   return (
     <Stack spacing={3}>
       <Alert severity="info" sx={{ borderRadius: 3 }}>
-        拍摄 3–5 张不同角度的照片，可显著提高远距离识别准确率。若学生佩戴姓名牌，可使用下方「名牌识别」自动填入姓名。
+        可通过摄像头实时拍照，或上传已有照片录入人脸。建议 3–5 张不同角度以提高识别准确率。
       </Alert>
 
-      <CameraView showOverlay={false} />
+      <Card>
+        <Tabs
+          value={mode}
+          onChange={(_, value: EnrollMode) => setMode(value)}
+          variant="fullWidth"
+          sx={{ borderBottom: 1, borderColor: "divider" }}
+        >
+          <Tab icon={<CameraAltIcon />} iconPosition="start" label="摄像头拍照" value="camera" />
+          <Tab icon={<PhotoLibraryIcon />} iconPosition="start" label="上传照片" value="upload" />
+        </Tabs>
+        <CardContent>
+          {mode === "camera" ? (
+            <CameraView showOverlay={false} />
+          ) : (
+            <PhotoUploadZone
+              onPhotosAdded={addPhotos}
+              disabled={loading || ocrLoading}
+            />
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent>
           <Stack spacing={2}>
             <Stack direction="row" spacing={1} alignItems="center">
               <BadgeIcon color="primary" />
-              <Typography variant="subtitle1">名牌识别</Typography>
+              <Typography variant="subtitle1">名牌识别（可选）</Typography>
             </Stack>
             <Typography variant="body2" color="text.secondary">
-              让学生佩戴写有姓名的牌子，确保人脸与胸牌同时出现在画面中。系统会从胸牌区域 OCR 识别姓名并自动填入。
+              若照片中含姓名牌，可自动 OCR 识别姓名并填入下方表单。
             </Typography>
             {ocrResult?.name && (
               <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
@@ -194,20 +231,23 @@ export function EnrollPage() {
               </Stack>
             )}
             <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
+              {mode === "camera" && (
+                <Button
+                  variant="contained"
+                  startIcon={<BadgeIcon />}
+                  onClick={captureAndRecognize}
+                  disabled={ocrLoading || loading}
+                >
+                  {ocrLoading ? "识别中…" : "拍照并识别名牌"}
+                </Button>
+              )}
               <Button
-                variant="contained"
+                variant={mode === "camera" ? "outlined" : "contained"}
                 startIcon={<BadgeIcon />}
-                onClick={captureAndRecognize}
-                disabled={ocrLoading || loading}
-              >
-                {ocrLoading ? "识别中…" : "拍照并识别名牌"}
-              </Button>
-              <Button
-                variant="outlined"
                 onClick={recognizeLatestPhoto}
                 disabled={ocrLoading || loading || captured.length === 0}
               >
-                重新识别最新照片
+                {ocrLoading ? "识别中…" : mode === "upload" ? "识别最新上传照片" : "重新识别最新照片"}
               </Button>
               <Button
                 variant="outlined"
@@ -238,7 +278,7 @@ export function EnrollPage() {
         <Card>
           <CardContent>
             <Typography variant="subtitle2" gutterBottom color="text.secondary">
-              已拍 {captured.length} 张
+              已选 {captured.length} 张
             </Typography>
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 1.5 }}>
               {captured.map((img, i) => (
@@ -261,9 +301,21 @@ export function EnrollPage() {
       )}
 
       <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1.5 }}>
-        <Button variant="outlined" startIcon={<CameraAltIcon />} onClick={capturePhoto} size="large">
-          拍照 ({captured.length})
-        </Button>
+        {mode === "camera" && (
+          <Button variant="outlined" startIcon={<CameraAltIcon />} onClick={capturePhoto} size="large">
+            拍照 ({captured.length})
+          </Button>
+        )}
+        {mode === "upload" && (
+          <Button
+            variant="outlined"
+            startIcon={<PhotoLibraryIcon />}
+            onClick={() => document.getElementById("enroll-upload-more")?.click()}
+            size="large"
+          >
+            继续上传
+          </Button>
+        )}
         <Button variant="contained" startIcon={<SaveIcon />} onClick={submit} disabled={loading} size="large">
           {loading ? "保存中…" : "保存"}
         </Button>
@@ -271,6 +323,26 @@ export function EnrollPage() {
           取消
         </Button>
       </Stack>
+
+      {mode === "upload" && (
+        <input
+          id="enroll-upload-more"
+          type="file"
+          hidden
+          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          multiple
+          onChange={(e) => {
+            const files = e.target.files;
+            if (!files) return;
+            void filesToDataUrls(files)
+              .then(addPhotos)
+              .catch((err) => setError(err instanceof Error ? err.message : "上传失败"))
+              .finally(() => {
+                e.target.value = "";
+              });
+          }}
+        />
+      )}
 
       <canvas ref={previewRef} style={{ display: "none" }} />
     </Stack>

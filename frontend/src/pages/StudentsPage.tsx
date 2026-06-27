@@ -3,6 +3,7 @@ import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import FaceIcon from "@mui/icons-material/Face";
+import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import {
   Alert,
@@ -23,6 +24,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -31,6 +34,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Student } from "../api/client";
 import { CameraView } from "../components/CameraView";
+import { PhotoUploadZone } from "../components/PhotoUploadZone";
 
 export function StudentsPage() {
   const navigate = useNavigate();
@@ -39,6 +43,7 @@ export function StudentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Student | null>(null);
   const [reenrolling, setReenrolling] = useState<Student | null>(null);
+  const [reenrollMode, setReenrollMode] = useState<"camera" | "upload">("camera");
   const [captured, setCaptured] = useState<string[]>([]);
   const previewRef = useRef<HTMLCanvasElement>(null);
 
@@ -195,11 +200,23 @@ export function StudentsPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={!!reenrolling} onClose={() => { setReenrolling(null); setCaptured([]); }} fullWidth maxWidth="md">
+      <Dialog open={!!reenrolling} onClose={() => { setReenrolling(null); setCaptured([]); setReenrollMode("camera"); }} fullWidth maxWidth="md">
         <DialogTitle>重新录入人脸 — {reenrolling?.name}</DialogTitle>
         <DialogContent>
           <Stack spacing={2}>
-            <CameraView showOverlay={false} />
+            <Tabs
+              value={reenrollMode}
+              onChange={(_, value: "camera" | "upload") => setReenrollMode(value)}
+              variant="fullWidth"
+            >
+              <Tab icon={<CameraAltIcon />} iconPosition="start" label="摄像头" value="camera" />
+              <Tab icon={<PhotoLibraryIcon />} iconPosition="start" label="上传照片" value="upload" />
+            </Tabs>
+            {reenrollMode === "camera" ? (
+              <CameraView showOverlay={false} />
+            ) : (
+              <PhotoUploadZone onPhotosAdded={(imgs) => setCaptured((prev) => [...prev, ...imgs])} />
+            )}
             {captured.length > 0 && (
               <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
                 {captured.map((img, i) => (
@@ -210,11 +227,13 @@ export function StudentsPage() {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button startIcon={<CameraAltIcon />} onClick={capturePhoto}>
-            拍照 ({captured.length})
-          </Button>
+          {reenrollMode === "camera" && (
+            <Button startIcon={<CameraAltIcon />} onClick={capturePhoto}>
+              拍照 ({captured.length})
+            </Button>
+          )}
           <Box sx={{ flex: 1 }} />
-          <Button onClick={() => { setReenrolling(null); setCaptured([]); }}>取消</Button>
+          <Button onClick={() => { setReenrolling(null); setCaptured([]); setReenrollMode("camera"); }}>取消</Button>
           <Button variant="contained" onClick={submitReenroll} disabled={captured.length === 0}>
             提交
           </Button>

@@ -1,3 +1,4 @@
+import EventNoteIcon from "@mui/icons-material/EventNote";
 import FaceRetouchingNaturalIcon from "@mui/icons-material/FaceRetouchingNatural";
 import GroupsIcon from "@mui/icons-material/Groups";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
@@ -25,6 +26,7 @@ const iconMap = {
   face: FaceRetouchingNaturalIcon,
   person_add: PersonAddIcon,
   groups: GroupsIcon,
+  attendance: EventNoteIcon,
   smart_toy: SmartToyIcon,
   rokid: ViewInArIcon,
 };
@@ -33,6 +35,7 @@ const titleMap: Record<string, string> = {
   "/": "实时识别",
   "/enroll": "录入学生",
   "/students": "学生管理",
+  "/attendance": "考勤表",
   "/assistant": "AI 助手",
   "/rokid": "Rokid 眼镜",
   "/glasses": "Rokid 眼镜",

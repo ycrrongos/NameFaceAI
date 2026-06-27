@@ -18,6 +18,9 @@ class Student(Base):
     embeddings: Mapped[list["FaceEmbedding"]] = relationship(
         "FaceEmbedding", back_populates="student", cascade="all, delete-orphan"
     )
+    attendance_records: Mapped[list["Attendance"]] = relationship(
+        "Attendance", back_populates="student", cascade="all, delete-orphan"
+    )
 
 
 class FaceEmbedding(Base):
