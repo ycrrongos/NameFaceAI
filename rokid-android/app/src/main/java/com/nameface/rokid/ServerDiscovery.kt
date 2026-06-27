@@ -19,6 +19,7 @@ import javax.net.ssl.X509TrustManager
 object ServerDiscovery {
 
     private const val BACKEND_PORT = 8000
+    private const val TCP_RECOGNIZE_PORT = Prefs.DEFAULT_TCP_RECOGNIZE_PORT
     private const val FRONTEND_PORT_HTTPS = 5173
     private const val FRONTEND_PORT_HTTP = 5174
     private const val CONNECT_TIMEOUT_MS = 1200
@@ -39,7 +40,9 @@ object ServerDiscovery {
     fun verifySaved(context: Context): Boolean {
         val backendIp = Prefs.getBackendIp(context)
         if (!probeBackend(backendIp)) return false
-        return probeFrontendHost(Prefs.getFrontendHost(context), Prefs.useHttps(context))
+        if (!probeFrontendHost(Prefs.getFrontendHost(context), Prefs.useHttps(context))) return false
+        if (DeviceProfile.useNativeCamera() && !probeTcp(backendIp)) return false
+        return true
     }
 
     private fun runDiscovery(): Result? {
@@ -59,12 +62,15 @@ object ServerDiscovery {
     }
 
     private fun findBackendIp(prefix: String, localIp: String): String? {
+        val requireTcp = DeviceProfile.useNativeCamera()
         val found = AtomicReference<String?>(null)
         val executor = Executors.newFixedThreadPool(48)
         for (ip in buildIpCandidates(prefix, localIp)) {
             executor.submit {
                 if (found.get() != null) return@submit
-                if (probeBackend(ip)) found.compareAndSet(null, ip)
+                if (!probeBackend(ip)) return@submit
+                if (requireTcp && !probeTcp(ip)) return@submit
+                found.compareAndSet(null, ip)
             }
         }
         executor.shutdown()
@@ -155,6 +161,17 @@ object ServerDiscovery {
             val body = conn.inputStream.bufferedReader().use { it.readText() }
             body.contains("\"status\"") &&
                 (body.contains("model_loaded") || body.contains("\"ok\""))
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun probeTcp(ip: String): Boolean {
+        return try {
+            java.net.Socket().use { socket ->
+                socket.connect(java.net.InetSocketAddress(ip, TCP_RECOGNIZE_PORT), CONNECT_TIMEOUT_MS)
+            }
+            true
         } catch (_: Exception) {
             false
         }

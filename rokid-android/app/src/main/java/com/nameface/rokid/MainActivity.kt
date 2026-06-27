@@ -17,7 +17,6 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.os.Build
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -31,15 +30,17 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private var pendingPermissionRequest: PermissionRequest? = null
+    private var jsBridge: RokidJsBridge? = null
+    private var serverReady = false
 
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             val request = pendingPermissionRequest
             pendingPermissionRequest = null
             when {
-                granted && request != null -> request.grant(request.resources)
+                granted && request != null -> runOnUiThread { request.grant(request.resources) }
                 granted -> startWithDiscovery()
-                request != null -> request.deny()
+                request != null -> runOnUiThread { request.deny() }
                 else -> Toast.makeText(this, R.string.camera_permission_denied, Toast.LENGTH_LONG).show()
             }
         }
@@ -75,6 +76,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         binding.webView.onResume()
         enterImmersiveMode()
+        ensureNativeRunning()
     }
 
     override fun onPause() {
@@ -83,6 +85,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        if (DeviceProfile.useNativeCamera() && isFinishing) {
+            RecognizeStreamService.stop(this)
+        }
         binding.webView.destroy()
         super.onDestroy()
     }
@@ -100,6 +105,14 @@ class MainActivity : AppCompatActivity() {
     private fun configureWebView(webView: WebView) {
         webView.setBackgroundColor(Color.BLACK)
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+
+        jsBridge = RokidJsBridge(webView).also { bridge ->
+            RecognizeStreamService.jsBridge = bridge
+            if (DeviceProfile.useNativeCamera()) {
+                bridge.onPageReady = { ensureNativeRunning() }
+            }
+            webView.addJavascriptInterface(bridge, "NameFaceRokidNative")
+        }
 
         with(webView.settings) {
             javaScriptEnabled = true
@@ -138,6 +151,17 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView, url: String?) {
                 binding.loadingOverlay.visibility = View.GONE
+                val native = DeviceProfile.useNativeCamera()
+                view.evaluateJavascript(
+                    """
+                    window.NameFaceRokid=window.NameFaceRokid||{};
+                    window.NameFaceRokid.nativeCamera=$native;
+                    if($native&&window.NameFaceRokidNative&&window.NameFaceRokidNative.onPageReady){
+                      window.NameFaceRokidNative.onPageReady();
+                    }
+                    """.trimIndent(),
+                    null,
+                )
             }
         }
 
@@ -147,14 +171,47 @@ class MainActivity : AppCompatActivity() {
                     it == PermissionRequest.RESOURCE_VIDEO_CAPTURE ||
                         it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
                 }
-                if (needsCamera && !hasCameraPermission()) {
-                    pendingPermissionRequest = request
-                    cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                if (needsCamera) {
+                    if (DeviceProfile.useNativeCamera()) {
+                        runOnUiThread { request.deny() }
+                        return
+                    }
+                    if (!hasCameraPermission()) {
+                        pendingPermissionRequest = request
+                        cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                        return
+                    }
+                    runOnUiThread { request.grant(request.resources) }
                     return
                 }
                 runOnUiThread { request.grant(request.resources) }
             }
         }
+    }
+
+    private fun ensureNativeRunning() {
+        if (!DeviceProfile.useNativeCamera() || !hasCameraPermission() || !serverReady) return
+        RecognizeStreamService.jsBridge = jsBridge
+        val backend = Prefs.getBackendHost(this)
+        if (RecognizeStreamService.isRunning() && RecognizeStreamService.activeBackendHost == backend) {
+            return
+        }
+        restartNativeRecognize()
+    }
+
+    private fun restartNativeRecognize() {
+        if (!DeviceProfile.useNativeCamera() || !hasCameraPermission() || !serverReady) return
+        RecognizeStreamService.jsBridge = jsBridge
+        val backend = Prefs.getBackendHost(this)
+        if (RecognizeStreamService.isRunning()) {
+            if (RecognizeStreamService.activeBackendHost == backend) return
+            RecognizeStreamService.stop(this)
+        }
+        RecognizeStreamService.start(this, backend)
+    }
+
+    private fun startNativeRecognize() {
+        ensureNativeRunning()
     }
 
     private fun startWithDiscovery() {
@@ -203,9 +260,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadGlassesPage() {
+        serverReady = true
         binding.loadingOverlay.visibility = View.VISIBLE
-        val url = Prefs.buildGlassesUrl(this)
-        binding.webView.loadUrl(url)
+        binding.webView.loadUrl(Prefs.buildGlassesUrl(this))
+        ensureNativeRunning()
     }
 
     private fun clearWebViewCacheIfUpdated(webView: WebView) {

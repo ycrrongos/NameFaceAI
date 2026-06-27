@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +8,9 @@ from app.api import attendance, health, llm, ocr, preview, recognize, students
 from app.config import settings
 from app.database import init_db
 from app.services.face_service import face_service
+from app.services.tcp_recognize_server import run_tcp_recognize_server
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -22,7 +26,18 @@ async def lifespan(app: FastAPI):
         ocr_service.load_model()
     except Exception:
         pass
+
+    tcp_server = None
+    try:
+        tcp_server = await run_tcp_recognize_server()
+    except Exception:
+        logger.exception("Failed to start TCP recognize server on port %s", settings.tcp_recognize_port)
+
     yield
+
+    if tcp_server is not None:
+        tcp_server.close()
+        await tcp_server.wait_closed()
 
 
 app = FastAPI(title="NameFaceAI", version="1.0.0", lifespan=lifespan)

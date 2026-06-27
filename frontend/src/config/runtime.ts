@@ -24,6 +24,16 @@ export function isRokidWebView(): boolean {
   return typeof navigator !== "undefined" && /NameFaceRokid/i.test(navigator.userAgent);
 }
 
+/** 由 APK 注入 window.NameFaceRokid.nativeCamera；仅 Rokid 眼镜走原生 TCP */
+export function isRokidNativeCamera(): boolean {
+  if (typeof window === "undefined") return false;
+  const injected = window.NameFaceRokid?.nativeCamera;
+  if (injected === true) return true;
+  if (injected === false) return false;
+  const param = new URLSearchParams(window.location.search).get("native");
+  return param === "1" || param === "true";
+}
+
 export function getWsRecognizeUrl(): string {
   const backend = getBackendParam();
   const backendHost = backend?.replace(/^https?:\/\//, "") ?? null;
@@ -49,6 +59,15 @@ export function getWsRecognizeUrl(): string {
   }
 
   if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
+
+  // 开发环境：HTTP 直连后端 8000，绕过 Vite WS 代理不稳定问题
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    const port = window.location.port;
+    if ((port === "5173" || port === "5174") && window.location.protocol === "http:") {
+      return `ws://${window.location.hostname}:8000/ws/recognize`;
+    }
+  }
+
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${window.location.host}/ws/recognize`;
 }

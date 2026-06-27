@@ -12,8 +12,9 @@ export default defineConfig({
     proxy: {
       "/api": "http://localhost:8000",
       "/ws": {
-        target: "ws://localhost:8000",
+        target: "ws://127.0.0.1:8000",
         ws: true,
+        changeOrigin: true,
       },
       "/phone-cam": {
         target: "http://127.0.0.1:8765",

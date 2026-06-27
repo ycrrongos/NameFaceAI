@@ -13,6 +13,7 @@ object Prefs {
 
     private const val DEFAULT_FRONTEND = "192.168.1.10:5173"
     private const val DEFAULT_BACKEND = "192.168.1.10:8000"
+    const val DEFAULT_TCP_RECOGNIZE_PORT = 8001
 
     fun getFrontendHost(context: Context): String {
         return prefs(context).getString(KEY_FRONTEND, DEFAULT_FRONTEND) ?: DEFAULT_FRONTEND
@@ -65,21 +66,23 @@ object Prefs {
             .apply()
     }
 
+    fun getBackendIp(context: Context): String =
+        getBackendHost(context).substringBefore(':')
+
+    fun getTcpRecognizePort(context: Context): Int = DEFAULT_TCP_RECOGNIZE_PORT
+
     fun buildGlassesUrl(context: Context): String {
         val scheme = if (useHttps(context)) "https" else "http"
         val frontend = getFrontendHost(context)
         val backend = getBackendHost(context)
-        val useHttps = useHttps(context)
         val wsUrl = "ws://$backend/ws/recognize"
         val wsParam = URLEncoder.encode(wsUrl, "UTF-8")
-        return "$scheme://$frontend/rokid?backend=$backend&ws=$wsParam&v=${BuildConfig.VERSION_CODE}"
+        val nativeFlag = if (DeviceProfile.useNativeCamera()) "&native=1" else ""
+        return "$scheme://$frontend/rokid?backend=$backend&ws=$wsParam$nativeFlag&v=${BuildConfig.VERSION_CODE}"
     }
 
     fun getFrontendIp(context: Context): String =
         getFrontendHost(context).substringBefore(':')
-
-    fun getBackendIp(context: Context): String =
-        getBackendHost(context).substringBefore(':')
 
     private fun sanitizeHost(value: String): String {
         return value

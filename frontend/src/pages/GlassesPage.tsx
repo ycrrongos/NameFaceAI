@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { GlassesCamera, pickCenterFace } from "../components/GlassesCamera";
-import { getBackendParam, isRokidWebView } from "../config/runtime";
+import { getBackendParam, isRokidNativeCamera, isRokidWebView } from "../config/runtime";
+import { useRokidNativeRecognize } from "../hooks/useRokidNativeRecognize";
 import { useRecognizeWebSocket } from "../hooks/useWebSocket";
 import "./GlassesPage.css";
 
 export function GlassesPage() {
   const rokid = isRokidWebView();
+  const nativeCamera = isRokidNativeCamera();
   const [fps, setFps] = useState(8);
   const [gpuMode, setGpuMode] = useState(false);
   const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
   const [punchFlash, setPunchFlash] = useState(false);
-  const { connected, faces, attendance, inferenceMs, error, sendFrame } = useRecognizeWebSocket(true);
+  const ws = useRecognizeWebSocket(!nativeCamera);
+  const native = useRokidNativeRecognize(nativeCamera);
+  const { connected, faces, attendance, inferenceMs, error } = nativeCamera ? native : ws;
 
   const primary = useMemo(
     () => pickCenterFace(faces, frameSize.width, frameSize.height),
@@ -56,13 +60,20 @@ export function GlassesPage() {
     if (inferenceMs == null) return;
     if (gpuMode) {
       const interval = Math.max(inferenceMs * 1.05, 40);
-      const cap = rokid ? 15 : 12;
-      setFps(Math.min(cap, Math.max(rokid ? 8 : 6, Math.round(1000 / interval))));
+      const cap = rokid ? 20 : 12;
+      setFps(Math.min(cap, Math.max(rokid ? 12 : 6, Math.round(1000 / interval))));
     } else {
       const interval = Math.max(inferenceMs * 1.3, 250);
       setFps(Math.min(4, Math.max(1, Math.round(1000 / interval))));
     }
   }, [inferenceMs, gpuMode, rokid]);
+
+  useEffect(() => {
+    if (!nativeCamera) return;
+    if (native.frameSize.width > 0) {
+      setFrameSize(native.frameSize);
+    }
+  }, [nativeCamera, native.frameSize.width, native.frameSize.height]);
 
   useEffect(() => {
     if (!primaryCheckIn?.newly_marked || rokid) return;
@@ -75,7 +86,7 @@ export function GlassesPage() {
 
   return (
     <div className={`glasses-page${rokid ? " glasses-page--rokid" : ""}`}>
-      {!rokid && (
+      {!nativeCamera && (
         <div className="glasses-page__hud-top">
           <div className="glasses-page__status">
             <span className={`glasses-page__dot ${connected ? "glasses-page__dot--on" : "glasses-page__dot--warn"}`} />
@@ -92,16 +103,18 @@ export function GlassesPage() {
 
       <GlassesCamera
         faces={faces}
-        onFrame={sendFrame}
+        onFrame={nativeCamera ? undefined : ws.sendFrame}
         onFrameSize={(width, height) => setFrameSize({ width, height })}
+        sourceFrameSize={frameSize}
         fps={fps}
-        captureMaxWidth={rokid ? 480 : 640}
-        captureQuality={rokid ? 0.5 : 0.6}
-        hideVideo={rokid}
-        autoStart={rokid}
+        captureMaxWidth={nativeCamera ? 960 : 640}
+        captureQuality={nativeCamera ? 0.55 : 0.6}
+        hideVideo={nativeCamera}
+        autoStart={!nativeCamera}
+        nativeCapture={nativeCamera}
       />
 
-      {!rokid && (
+      {!nativeCamera && (
         <>
           <div className="glasses-page__name-panel">
             {primary ? (

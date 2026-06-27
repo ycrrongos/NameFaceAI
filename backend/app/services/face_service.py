@@ -1,9 +1,12 @@
+import threading
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
 import onnxruntime as ort
 from insightface.app import FaceAnalysis
+from insightface.utils import ensure_available
 from sqlalchemy.orm import Session
 
 from app.config import FACES_DIR, PROJECT_ROOT, settings
@@ -34,6 +37,8 @@ class MatchResult:
 class FaceService:
     def __init__(self) -> None:
         self._app: FaceAnalysis | None = None
+        self._loaded_key: tuple[str, int, float] | None = None
+        self._lock = threading.RLock()
         self.provider = "CPUExecutionProvider"
         self.accelerator = "cpu"  # gpu | igpu | cpu
         self.gpu = False
@@ -42,6 +47,27 @@ class FaceService:
     @property
     def model_loaded(self) -> bool:
         return self._app is not None
+
+    @staticmethod
+    def _ensure_model_pack(name: str) -> None:
+        """Fix nested antelopev2.zip layout (models/antelopev2/antelopev2/*.onnx)."""
+        model_dir = Path(ensure_available("models", name, root="~/.insightface")).resolve()
+        nested = model_dir / name
+        if not nested.is_dir():
+            return
+        if any(model_dir.glob("*.onnx")):
+            return
+        for item in nested.iterdir():
+            target = model_dir / item.name
+            if not target.exists():
+                item.rename(target)
+        try:
+            nested.rmdir()
+        except OSError:
+            pass
+
+    def _model_key(self) -> tuple[str, int, float]:
+        return (settings.face_model_name, settings.face_det_size, settings.face_det_thresh)
 
     def _try_load_with_provider(self, provider: str) -> bool:
         if provider == "CPUExecutionProvider":
@@ -52,6 +78,7 @@ class FaceService:
             ctx_id = 0
 
         try:
+            self._ensure_model_pack(settings.face_model_name)
             app = FaceAnalysis(
                 name=settings.face_model_name,
                 providers=providers,
@@ -73,23 +100,29 @@ class FaceService:
             return False
 
     def load_model(self) -> None:
-        if self._app is not None:
-            return
-
-        available = set(ort.get_available_providers())
-        for provider, accelerator in _PROVIDER_PRIORITY:
-            if provider not in available:
-                continue
-            if self._try_load_with_provider(provider):
-                self.accelerator = accelerator
-                self.gpu = True
+        with self._lock:
+            key = self._model_key()
+            if self._app is not None and self._loaded_key == key:
                 return
+            self._app = None
+            self._loaded_key = None
 
-        if not self._try_load_with_provider("CPUExecutionProvider"):
-            raise RuntimeError("Failed to load face recognition model on any execution provider")
-        self.accelerator = "cpu"
-        self.gpu = False
-        self.provider = "CPUExecutionProvider"
+            available = set(ort.get_available_providers())
+            for provider, accelerator in _PROVIDER_PRIORITY:
+                if provider not in available:
+                    continue
+                if self._try_load_with_provider(provider):
+                    self.accelerator = accelerator
+                    self.gpu = True
+                    self._loaded_key = key
+                    return
+
+            if not self._try_load_with_provider("CPUExecutionProvider"):
+                raise RuntimeError("Failed to load face recognition model on any execution provider")
+            self.accelerator = "cpu"
+            self.gpu = False
+            self.provider = "CPUExecutionProvider"
+            self._loaded_key = key
 
     def decode_image(self, data: bytes) -> np.ndarray:
         arr = np.frombuffer(data, dtype=np.uint8)
@@ -106,30 +139,42 @@ class FaceService:
         data = base64.b64decode(b64)
         return self.decode_image(data)
 
-    def _resize_for_inference(self, image: np.ndarray) -> tuple[np.ndarray, float]:
-        max_size = settings.face_max_image_size
+    def _prepare_for_inference(self, image: np.ndarray) -> tuple[np.ndarray, float]:
         h, w = image.shape[:2]
-        if max(h, w) <= max_size:
-            return image, 1.0
-        scale = max_size / max(h, w)
-        return cv2.resize(image, (int(w * scale), int(h * scale))), scale
+        scale = 1.0
+
+        min_size = settings.face_min_image_size
+        if min_size > 0 and max(h, w) < min_size:
+            up = min_size / max(h, w)
+            image = cv2.resize(image, (int(w * up), int(h * up)), interpolation=cv2.INTER_LINEAR)
+            scale *= up
+
+        max_size = settings.face_max_image_size
+        if max_size > 0 and max(image.shape[:2]) > max_size:
+            down = max_size / max(image.shape[:2])
+            nh, nw = image.shape[:2]
+            image = cv2.resize(image, (int(nw * down), int(nh * down)), interpolation=cv2.INTER_AREA)
+            scale *= down
+
+        return image, scale
 
     def detect_and_embed(self, image: np.ndarray) -> list[FaceResult]:
-        if self._app is None:
-            self.load_model()
+        with self._lock:
+            if self._app is None:
+                self.load_model()
 
-        import time
+            import time
 
-        image, scale = self._resize_for_inference(image)
-        start = time.perf_counter()
-        faces = self._app.get(image)
-        self._last_inference_ms = (time.perf_counter() - start) * 1000
+            image, scale = self._prepare_for_inference(image)
+            start = time.perf_counter()
+            faces = self._app.get(image)
+            self._last_inference_ms = (time.perf_counter() - start) * 1000
 
-        results: list[FaceResult] = []
-        for face in faces:
-            bbox = (face.bbox.astype(float) / scale).tolist()
-            results.append(FaceResult(bbox=bbox, embedding=face.normed_embedding.copy()))
-        return results
+            results: list[FaceResult] = []
+            for face in faces:
+                bbox = (face.bbox.astype(float) / scale).tolist()
+                results.append(FaceResult(bbox=bbox, embedding=face.normed_embedding.copy()))
+            return results
 
     @staticmethod
     def _embedding_to_bytes(embedding: np.ndarray) -> bytes:

@@ -56,7 +56,7 @@ function drawOverlay(
 }
 
 export function RokidPreviewPage() {
-  const { connected, preview, error, frameCount, resetStats } = useRokidPreview(true);
+  const { connected, preview, error, frameCount, stale, resetStats } = useRokidPreview(true);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -105,6 +105,10 @@ export function RokidPreviewPage() {
 
       {!preview && connected && (
         <Alert severity="info">已连接，等待眼镜端发送画面…</Alert>
+      )}
+
+      {stale && preview && (
+        <Alert severity="warning">超过 5 秒未收到新帧，请检查眼镜是否在线、后端 TCP 8001 是否可达。</Alert>
       )}
 
       {!connected && (
