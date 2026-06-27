@@ -245,7 +245,7 @@ export function GlassesCamera({
               ctx.strokeRect(left, top, width, height);
 
               const label = known ? face.name : "?";
-              ctx.font = "700 28px 'Noto Sans SC', sans-serif";
+              ctx.font = '700 28px "Noto Sans SC", Roboto, sans-serif';
               const tw = ctx.measureText(label).width + 24;
               ctx.fillStyle = known ? "rgba(57,255,20,0.85)" : "rgba(255,68,68,0.85)";
               ctx.fillRect(left, top - 40, tw, 36);

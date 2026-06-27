@@ -12,7 +12,7 @@ export function GlassesPage() {
   const { t, faceName } = useI18n();
   const rokid = isRokidWebView();
   const nativeCamera = isRokidNativeCamera();
-  const showCenterHud = rokid && !nativeCamera;
+  const showCenterHud = rokid;
   const showBrowserPanel = !rokid && !nativeCamera;
   const [fps, setFps] = useState(8);
   const [gpuMode, setGpuMode] = useState(false);
@@ -119,7 +119,7 @@ export function GlassesPage() {
         captureMaxWidth={nativeCamera ? 960 : rokid ? 480 : 640}
         captureQuality={nativeCamera ? 0.55 : rokid ? 0.5 : 0.6}
         hideVideo={nativeCamera || rokid}
-        hideOverlay={showCenterHud}
+        hideOverlay={rokid}
         autoStart={!nativeCamera && (rokid || showBrowserPanel)}
         nativeCapture={nativeCamera}
       />
