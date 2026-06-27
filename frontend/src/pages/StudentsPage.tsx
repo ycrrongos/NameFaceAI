@@ -1,9 +1,39 @@
+import AddIcon from "@mui/icons-material/Add";
+import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import FaceIcon from "@mui/icons-material/Face";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { api, type Student } from "../api/client";
 import { CameraView } from "../components/CameraView";
 
 export function StudentsPage() {
+  const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,14 +79,12 @@ export function StudentsPage() {
   };
 
   const capturePhoto = () => {
-    const video = document.querySelector(".camera-video") as HTMLVideoElement | null;
+    const video = document.querySelector("video") as HTMLVideoElement | null;
     const canvas = previewRef.current;
     if (!video || !canvas || video.readyState < 2) return;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0);
+    canvas.getContext("2d")?.drawImage(video, 0, 0);
     setCaptured((prev) => [...prev, canvas.toDataURL("image/jpeg", 0.85)]);
   };
 
@@ -78,120 +106,122 @@ export function StudentsPage() {
   };
 
   return (
-    <div className="page">
-      <header className="page-header">
-        <h1>学生管理</h1>
-        <Link to="/enroll" className="btn btn-primary">
+    <Stack spacing={3}>
+      <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate("/enroll")}>
           录入新学生
-        </Link>
-      </header>
+        </Button>
+      </Stack>
 
-      {error && <p className="error">{error}</p>}
-      {loading && <p>加载中…</p>}
+      {error && <Alert severity="error">{error}</Alert>}
 
-      {!loading && students.length === 0 && (
-        <p className="empty">暂无学生，<Link to="/enroll">去录入</Link></p>
+      {loading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+          <CircularProgress />
+        </Box>
+      ) : students.length === 0 ? (
+        <Card sx={{ textAlign: "center", py: 6 }}>
+          <FaceIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
+          <Typography color="text.secondary" gutterBottom>
+            暂无学生
+          </Typography>
+          <Button variant="outlined" onClick={() => navigate("/enroll")}>
+            去录入
+          </Button>
+        </Card>
+      ) : (
+        <TableContainer component={Card}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>姓名</TableCell>
+                <TableCell>班级</TableCell>
+                <TableCell align="center">人脸数</TableCell>
+                <TableCell>备注</TableCell>
+                <TableCell align="right">操作</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {students.map((s) => (
+                <TableRow key={s.id} hover>
+                  <TableCell>
+                    <Typography sx={{ fontWeight: 500 }}>{s.name}</Typography>
+                  </TableCell>
+                  <TableCell>{s.class_name || "—"}</TableCell>
+                  <TableCell align="center">
+                    <Chip label={s.face_count} size="small" color={s.face_count > 0 ? "success" : "default"} variant="outlined" />
+                  </TableCell>
+                  <TableCell sx={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {s.notes || "—"}
+                  </TableCell>
+                  <TableCell align="right">
+                    <Tooltip title="编辑">
+                      <IconButton size="small" onClick={() => setEditing({ ...s })}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="重录人脸">
+                      <IconButton size="small" onClick={() => { setReenrolling(s); setCaptured([]); }}>
+                        <RefreshIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="删除">
+                      <IconButton size="small" color="error" onClick={() => deleteStudent(s.id)}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
 
-      <table className="student-table">
-        <thead>
-          <tr>
-            <th>姓名</th>
-            <th>班级</th>
-            <th>人脸数</th>
-            <th>备注</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {students.map((s) => (
-            <tr key={s.id}>
-              <td>{s.name}</td>
-              <td>{s.class_name || "—"}</td>
-              <td>{s.face_count}</td>
-              <td className="notes-cell">{s.notes || "—"}</td>
-              <td className="actions-cell">
-                <button type="button" className="btn btn-sm" onClick={() => setEditing({ ...s })}>
-                  编辑
-                </button>
-                <button type="button" className="btn btn-sm" onClick={() => { setReenrolling(s); setCaptured([]); }}>
-                  重录人脸
-                </button>
-                <button type="button" className="btn btn-sm btn-danger" onClick={() => deleteStudent(s.id)}>
-                  删除
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Dialog open={!!editing} onClose={() => setEditing(null)} fullWidth maxWidth="sm">
+        <DialogTitle>编辑学生</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <TextField label="姓名" fullWidth value={editing?.name ?? ""} onChange={(e) => setEditing((p) => p && { ...p, name: e.target.value })} />
+            <TextField label="班级" fullWidth value={editing?.class_name ?? ""} onChange={(e) => setEditing((p) => p && { ...p, class_name: e.target.value })} />
+            <TextField label="备注" fullWidth multiline rows={3} value={editing?.notes ?? ""} onChange={(e) => setEditing((p) => p && { ...p, notes: e.target.value })} />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEditing(null)}>取消</Button>
+          <Button variant="contained" onClick={saveEdit}>
+            保存
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-      {editing && (
-        <div className="modal">
-          <div className="modal-content">
-            <h2>编辑学生</h2>
-            <label>
-              姓名
-              <input
-                value={editing.name}
-                onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-              />
-            </label>
-            <label>
-              班级
-              <input
-                value={editing.class_name ?? ""}
-                onChange={(e) => setEditing({ ...editing, class_name: e.target.value })}
-              />
-            </label>
-            <label>
-              备注
-              <textarea
-                value={editing.notes ?? ""}
-                onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
-                rows={3}
-              />
-            </label>
-            <div className="actions">
-              <button type="button" className="btn btn-primary" onClick={saveEdit}>
-                保存
-              </button>
-              <button type="button" className="btn" onClick={() => setEditing(null)}>
-                取消
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {reenrolling && (
-        <div className="modal">
-          <div className="modal-content modal-wide">
-            <h2>重新录入人脸 — {reenrolling.name}</h2>
+      <Dialog open={!!reenrolling} onClose={() => { setReenrolling(null); setCaptured([]); }} fullWidth maxWidth="md">
+        <DialogTitle>重新录入人脸 — {reenrolling?.name}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
             <CameraView showOverlay={false} />
-            <div className="actions">
-              <button type="button" className="btn" onClick={capturePhoto}>
-                拍照 ({captured.length})
-              </button>
-              <button type="button" className="btn btn-primary" onClick={submitReenroll} disabled={captured.length === 0}>
-                提交
-              </button>
-              <button type="button" className="btn" onClick={() => { setReenrolling(null); setCaptured([]); }}>
-                取消
-              </button>
-            </div>
             {captured.length > 0 && (
-              <div className="photo-grid">
+              <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
                 {captured.map((img, i) => (
-                  <img key={i} src={img} alt={`capture ${i + 1}`} className="photo-thumb-img" />
+                  <Box key={i} component="img" src={img} alt={`capture ${i + 1}`} sx={{ width: 80, height: 80, objectFit: "cover", borderRadius: 2 }} />
                 ))}
-              </div>
+              </Stack>
             )}
-          </div>
-        </div>
-      )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button startIcon={<CameraAltIcon />} onClick={capturePhoto}>
+            拍照 ({captured.length})
+          </Button>
+          <Box sx={{ flex: 1 }} />
+          <Button onClick={() => { setReenrolling(null); setCaptured([]); }}>取消</Button>
+          <Button variant="contained" onClick={submitReenroll} disabled={captured.length === 0}>
+            提交
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <canvas ref={previewRef} style={{ display: "none" }} />
-    </div>
+    </Stack>
   );
 }

@@ -1,3 +1,17 @@
+import SendIcon from "@mui/icons-material/Send";
+import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
+import {
+  Alert,
+  Box,
+  Card,
+  Chip,
+  CircularProgress,
+  IconButton,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 
@@ -21,9 +35,7 @@ export function AssistantPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api.health().then((h) => {
-      setLlmAvailable(h.llm_provider);
-    });
+    api.health().then((h) => setLlmAvailable(h.llm_provider));
   }, []);
 
   useEffect(() => {
@@ -39,9 +51,7 @@ export function AssistantPage() {
     setLoading(true);
     setError(null);
     try {
-      const resp = await api.chat(
-        next.map((m) => ({ role: m.role, content: m.content }))
-      );
+      const resp = await api.chat(next.map((m) => ({ role: m.role, content: m.content })));
       setMessages([...next, { role: "assistant", content: resp.reply }]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "请求失败");
@@ -51,65 +61,90 @@ export function AssistantPage() {
   };
 
   return (
-    <div className="page assistant-page">
-      <header className="page-header">
-        <h1>AI 助手</h1>
-        <p className="subtitle">
-          {llmAvailable
-            ? `当前 Provider: ${llmAvailable}`
-            : "LLM 未配置 — 请在 backend/.env 中设置 LLM_PROVIDER"}
-        </p>
-      </header>
-
+    <Stack spacing={2} sx={{ height: { md: "calc(100vh - 160px)" }, minHeight: 480 }}>
       {!llmAvailable && (
-        <div className="info-box">
-          <p>支持以下配置（任选其一）：</p>
-          <ul>
-            <li><code>LLM_PROVIDER=dashscope</code> + <code>DASHSCOPE_API_KEY</code></li>
-            <li><code>LLM_PROVIDER=deepseek</code> + <code>DEEPSEEK_API_KEY</code></li>
-            <li><code>LLM_PROVIDER=ollama</code> + 本地 Ollama（如 qwen2.5:7b）</li>
-          </ul>
-        </div>
+        <Alert severity="info" sx={{ borderRadius: 3 }}>
+          LLM 未配置。在 <code>backend/.env</code> 中设置{" "}
+          <code>LLM_PROVIDER=dashscope|deepseek|ollama</code>
+        </Alert>
       )}
 
-      <div className="chat-messages">
-        {messages.length === 0 && (
-          <div className="suggestions">
-            {SUGGESTIONS.map((s) => (
-              <button key={s} type="button" className="btn btn-suggestion" onClick={() => send(s)}>
-                {s}
-              </button>
+      {llmAvailable && (
+        <Chip icon={<SmartToyOutlinedIcon />} label={`Provider: ${llmAvailable}`} variant="outlined" sx={{ alignSelf: "flex-start" }} />
+      )}
+
+      <Card sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 360 }}>
+        <Box sx={{ flex: 1, overflow: "auto", p: 2 }}>
+          {messages.length === 0 && (
+            <Stack spacing={1} sx={{ alignItems: "flex-start" }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                试试这些问题：
+              </Typography>
+              {SUGGESTIONS.map((s) => (
+                <Chip key={s} label={s} onClick={() => send(s)} clickable variant="outlined" sx={{ height: "auto", py: 1, "& .MuiChip-label": { whiteSpace: "normal" } }} />
+              ))}
+            </Stack>
+          )}
+
+          <Stack spacing={1.5}>
+            {messages.map((m, i) => (
+              <Box key={i} sx={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    px: 2,
+                    py: 1.5,
+                    maxWidth: "85%",
+                    borderRadius: m.role === "user" ? "20px 20px 4px 20px" : "20px 20px 20px 4px",
+                    bgcolor: m.role === "user" ? "primary.main" : "secondary.light",
+                    color: m.role === "user" ? "primary.contrastText" : "text.primary",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  <Typography variant="body1">{m.content}</Typography>
+                </Paper>
+              </Box>
             ))}
-          </div>
+            {loading && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <CircularProgress size={20} />
+                <Typography variant="body2" color="text.secondary">
+                  思考中…
+                </Typography>
+              </Box>
+            )}
+            <div ref={bottomRef} />
+          </Stack>
+        </Box>
+
+        {error && (
+          <Box sx={{ px: 2 }}>
+            <Alert severity="error">{error}</Alert>
+          </Box>
         )}
-        {messages.map((m, i) => (
-          <div key={i} className={`chat-bubble ${m.role}`}>
-            {m.content}
-          </div>
-        ))}
-        {loading && <div className="chat-bubble assistant">思考中…</div>}
-        <div ref={bottomRef} />
-      </div>
 
-      {error && <p className="error">{error}</p>}
-
-      <form
-        className="chat-input"
-        onSubmit={(e) => {
-          e.preventDefault();
-          send(input);
-        }}
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="输入问题，如：帮我记住张三的脸…"
-          disabled={loading}
-        />
-        <button type="submit" className="btn btn-primary" disabled={loading || !input.trim()}>
-          发送
-        </button>
-      </form>
-    </div>
+        <Box
+          component="form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            send(input);
+          }}
+          sx={{ p: 2, borderTop: 1, borderColor: "divider", display: "flex", gap: 1 }}
+        >
+          <TextField
+            fullWidth
+            placeholder="输入问题，如：帮我记住张三的脸…"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={loading}
+            size="small"
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 6 } }}
+          />
+          <IconButton type="submit" color="primary" disabled={loading || !input.trim()} sx={{ bgcolor: "primary.main", color: "#fff", "&:hover": { bgcolor: "primary.dark" }, "&.Mui-disabled": { bgcolor: "action.disabledBackground" } }}>
+            <SendIcon />
+          </IconButton>
+        </Box>
+      </Card>
+    </Stack>
   );
 }

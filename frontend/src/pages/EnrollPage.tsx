@@ -1,5 +1,20 @@
+import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/Delete";
+import SaveIcon from "@mui/icons-material/Save";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  IconButton,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { CameraView } from "../components/CameraView";
 
@@ -14,7 +29,7 @@ export function EnrollPage() {
   const previewRef = useRef<HTMLCanvasElement>(null);
 
   const capturePhoto = () => {
-    const video = document.querySelector(".camera-video") as HTMLVideoElement | null;
+    const video = document.querySelector("video") as HTMLVideoElement | null;
     const canvas = previewRef.current;
     if (!video || !canvas || video.readyState < 2) return;
     canvas.width = video.videoWidth;
@@ -22,12 +37,7 @@ export function EnrollPage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-    setCaptured((prev) => [...prev, dataUrl]);
-  };
-
-  const removePhoto = (index: number) => {
-    setCaptured((prev) => prev.filter((_, i) => i !== index));
+    setCaptured((prev) => [...prev, canvas.toDataURL("image/jpeg", 0.85)]);
   };
 
   const submit = async () => {
@@ -57,57 +67,64 @@ export function EnrollPage() {
   };
 
   return (
-    <div className="page">
-      <header className="page-header">
-        <h1>录入学生</h1>
-        <p className="subtitle">拍摄 3–5 张不同角度的照片，提高识别准确率</p>
-      </header>
+    <Stack spacing={3}>
+      <Alert severity="info" sx={{ borderRadius: 3 }}>
+        拍摄 3–5 张不同角度的照片，可显著提高远距离识别准确率
+      </Alert>
 
       <CameraView showOverlay={false} />
 
-      <div className="form">
-        <label>
-          姓名 *
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="学生姓名" />
-        </label>
-        <label>
-          班级
-          <input value={className} onChange={(e) => setClassName(e.target.value)} placeholder="如：三班" />
-        </label>
-        <label>
-          备注
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="可选备注" rows={2} />
-        </label>
-      </div>
+      <Card>
+        <CardContent>
+          <Stack spacing={2.5}>
+            <TextField label="姓名" required fullWidth value={name} onChange={(e) => setName(e.target.value)} />
+            <TextField label="班级" fullWidth placeholder="如：三班" value={className} onChange={(e) => setClassName(e.target.value)} />
+            <TextField label="备注" fullWidth multiline rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </Stack>
+        </CardContent>
+      </Card>
 
-      <div className="actions">
-        <button type="button" className="btn" onClick={capturePhoto}>
-          拍照 ({captured.length})
-        </button>
-        <button type="button" className="btn btn-primary" onClick={submit} disabled={loading}>
-          {loading ? "提交中…" : "保存"}
-        </button>
-        <Link to="/" className="btn btn-link">
-          取消
-        </Link>
-      </div>
-
-      {error && <p className="error">{error}</p>}
+      {error && <Alert severity="error">{error}</Alert>}
 
       {captured.length > 0 && (
-        <div className="photo-grid">
-          {captured.map((img, i) => (
-            <div key={i} className="photo-thumb">
-              <img src={img} alt={`capture ${i + 1}`} />
-              <button type="button" onClick={() => removePhoto(i)}>
-                删除
-              </button>
-            </div>
-          ))}
-        </div>
+        <Card>
+          <CardContent>
+            <Typography variant="subtitle2" gutterBottom color="text.secondary">
+              已拍 {captured.length} 张
+            </Typography>
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 1.5 }}>
+              {captured.map((img, i) => (
+                <Box key={i}>
+                  <Box sx={{ position: "relative", borderRadius: 2, overflow: "hidden" }}>
+                    <Box component="img" src={img} alt={`照片 ${i + 1}`} sx={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
+                    <IconButton
+                      size="small"
+                      onClick={() => setCaptured((p) => p.filter((_, j) => j !== i))}
+                      sx={{ position: "absolute", top: 4, right: 4, bgcolor: "rgba(0,0,0,0.5)", color: "#fff", "&:hover": { bgcolor: "rgba(0,0,0,0.7)" } }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          </CardContent>
+        </Card>
       )}
 
+      <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1.5 }}>
+        <Button variant="outlined" startIcon={<CameraAltIcon />} onClick={capturePhoto} size="large">
+          拍照 ({captured.length})
+        </Button>
+        <Button variant="contained" startIcon={<SaveIcon />} onClick={submit} disabled={loading} size="large">
+          {loading ? "保存中…" : "保存"}
+        </Button>
+        <Button variant="text" startIcon={<CloseIcon />} onClick={() => navigate("/")}>
+          取消
+        </Button>
+      </Stack>
+
       <canvas ref={previewRef} style={{ display: "none" }} />
-    </div>
+    </Stack>
   );
 }

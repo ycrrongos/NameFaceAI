@@ -1,3 +1,16 @@
+import RefreshIcon from "@mui/icons-material/Refresh";
+import VideocamOffIcon from "@mui/icons-material/VideocamOff";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+} from "@mui/material";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FaceMatch } from "../api/client";
 
@@ -9,6 +22,28 @@ interface CameraViewProps {
   captureQuality?: number;
   showOverlay?: boolean;
   mirrored?: boolean;
+}
+
+function getCameraErrorMessage(err: unknown): string {
+  if (typeof window !== "undefined" && !window.isSecureContext) {
+    const host = window.location.hostname;
+    if (host !== "localhost" && host !== "127.0.0.1") {
+      return `请使用 http://localhost:${window.location.port} 访问以启用摄像头`;
+    }
+  }
+  if (err instanceof DOMException) {
+    switch (err.name) {
+      case "NotAllowedError":
+        return "摄像头权限被拒绝，请在浏览器设置中允许访问";
+      case "NotFoundError":
+        return "未检测到摄像头设备";
+      case "NotReadableError":
+        return "摄像头被其他程序占用";
+      default:
+        return err.message;
+    }
+  }
+  return "无法访问摄像头，请检查浏览器权限";
 }
 
 export function CameraView({
@@ -24,76 +59,93 @@ export function CameraView({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const captureRef = useRef<HTMLCanvasElement>(null);
   const captureSizeRef = useRef({ width: 0, height: 0 });
+  const streamRef = useRef<MediaStream | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string>("");
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
 
-  const startCamera = useCallback(async (selectedId?: string) => {
-    try {
-      setCameraError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          deviceId: selectedId ? { exact: selectedId } : undefined,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      const allDevices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = allDevices.filter((d) => d.kind === "videoinput");
-      setDevices(videoDevices);
-    } catch {
-      setCameraError("无法访问摄像头，请检查浏览器权限");
-    }
+  const stopStream = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
 
+  const startCamera = useCallback(
+    async (selectedId?: string) => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraError("当前浏览器不支持摄像头");
+        return;
+      }
+      setStarting(true);
+      setCameraError(null);
+      stopStream();
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: selectedId
+            ? { deviceId: { ideal: selectedId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+            : { width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+        streamRef.current = stream;
+        const video = videoRef.current;
+        if (!video) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        video.srcObject = stream;
+        await video.play();
+        const allDevices = await navigator.mediaDevices.enumerateDevices();
+        setDevices(allDevices.filter((d) => d.kind === "videoinput"));
+      } catch (err) {
+        stopStream();
+        setCameraError(getCameraErrorMessage(err));
+      } finally {
+        setStarting(false);
+      }
+    },
+    [stopStream]
+  );
+
   useEffect(() => {
-    startCamera(deviceId || undefined);
+    let active = true;
+    void (async () => {
+      if (active) await startCamera(deviceId || undefined);
+    })();
     return () => {
-      const stream = videoRef.current?.srcObject as MediaStream | null;
-      stream?.getTracks().forEach((t) => t.stop());
+      active = false;
+      stopStream();
     };
-  }, [deviceId, startCamera]);
+  }, [deviceId, startCamera, stopStream]);
 
   useEffect(() => {
     if (!onFrame) return;
-
     const interval = setInterval(() => {
       const video = videoRef.current;
       const capture = captureRef.current;
       if (!video || !capture || video.readyState < 2) return;
 
-      capture.width = video.videoWidth;
-      capture.height = video.videoHeight;
-      const ctx = capture.getContext("2d");
-      if (!ctx) return;
-
-      let drawW = capture.width;
-      let drawH = capture.height;
+      let drawW = video.videoWidth;
+      let drawH = video.videoHeight;
       if (captureMaxWidth > 0 && drawW > captureMaxWidth) {
         const scale = captureMaxWidth / drawW;
         drawW = captureMaxWidth;
         drawH = Math.round(drawH * scale);
-        capture.width = drawW;
-        capture.height = drawH;
       }
-
+      capture.width = drawW;
+      capture.height = drawH;
+      const ctx = capture.getContext("2d");
+      if (!ctx) return;
       ctx.drawImage(video, 0, 0, drawW, drawH);
       captureSizeRef.current = { width: drawW, height: drawH };
-      if (!onFrame) return;
       capture.toBlob(
         (blob) => {
           if (blob) blob.arrayBuffer().then(onFrame);
         },
         "image/jpeg",
-        captureQuality,
+        captureQuality
       );
     }, 1000 / fps);
-
     return () => clearInterval(interval);
   }, [onFrame, fps, captureMaxWidth, captureQuality]);
 
@@ -122,22 +174,22 @@ export function CameraView({
             const top = y1 * scaleY;
             let width = (x2 - x1) * scaleX;
             const height = (y2 - y1) * scaleY;
-            if (mirrored) {
-              left = canvas.width - left - width;
-            }
+            if (mirrored) left = canvas.width - left - width;
 
             const isKnown = face.name !== "未知";
-            ctx.strokeStyle = isKnown ? "#22c55e" : "#ef4444";
+            ctx.strokeStyle = isKnown ? "#386A20" : "#B3261E";
             ctx.lineWidth = 3;
             ctx.strokeRect(left, top, width, height);
 
-            const label = `${face.name} (${(face.confidence * 100).toFixed(0)}%)`;
-            ctx.font = "bold 20px sans-serif";
-            const textWidth = ctx.measureText(label).width + 12;
-            ctx.fillStyle = isKnown ? "#22c55e" : "#ef4444";
-            ctx.fillRect(left, top - 28, textWidth, 28);
+            const label = `${face.name}  ${(face.confidence * 100).toFixed(0)}%`;
+            ctx.font = "600 22px Roboto, Noto Sans SC, sans-serif";
+            const textWidth = ctx.measureText(label).width + 20;
+            ctx.fillStyle = isKnown ? "#386A20" : "#B3261E";
+            ctx.beginPath();
+            ctx.roundRect(left, top - 36, textWidth, 32, 8);
+            ctx.fill();
             ctx.fillStyle = "#fff";
-            ctx.fillText(label, left + 6, top - 8);
+            ctx.fillText(label, left + 10, top - 12);
           }
         }
       }
@@ -148,27 +200,79 @@ export function CameraView({
   }, [faces, showOverlay, mirrored]);
 
   return (
-    <div className="camera-view">
+    <Stack spacing={2}>
       {devices.length > 1 && (
-        <select
-          className="camera-select"
-          value={deviceId}
-          onChange={(e) => setDeviceId(e.target.value)}
-        >
-          <option value="">默认摄像头</option>
-          {devices.map((d) => (
-            <option key={d.deviceId} value={d.deviceId}>
-              {d.label || `摄像头 ${d.deviceId.slice(0, 8)}`}
-            </option>
-          ))}
-        </select>
+        <FormControl size="small" sx={{ maxWidth: 320 }}>
+          <InputLabel id="camera-select-label">摄像头</InputLabel>
+          <Select
+            labelId="camera-select-label"
+            label="摄像头"
+            value={deviceId}
+            onChange={(e) => setDeviceId(e.target.value)}
+          >
+            <MenuItem value="">默认摄像头</MenuItem>
+            {devices.map((d) => (
+              <MenuItem key={d.deviceId} value={d.deviceId}>
+                {d.label || `摄像头 ${d.deviceId.slice(0, 8)}`}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       )}
-      {cameraError && <p className="error">{cameraError}</p>}
-      <div className="camera-container">
-        <video ref={videoRef} className={`camera-video ${mirrored ? "mirrored" : ""}`} playsInline muted />
-        {showOverlay && <canvas ref={canvasRef} className="camera-overlay" />}
-      </div>
+
+      {cameraError && (
+        <Alert
+          severity="error"
+          icon={<VideocamOffIcon />}
+          action={
+            <Button color="inherit" size="small" startIcon={<RefreshIcon />} onClick={() => void startCamera(deviceId || undefined)} disabled={starting}>
+              重试
+            </Button>
+          }
+        >
+          {cameraError}
+        </Alert>
+      )}
+
+      <Card sx={{ overflow: "hidden" }}>
+        <Box
+          sx={{
+            position: "relative",
+            bgcolor: "#1a1a2e",
+            aspectRatio: "16 / 9",
+            maxHeight: 480,
+          }}
+        >
+          <Box
+            component="video"
+            ref={videoRef}
+            playsInline
+            muted
+            sx={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+              transform: mirrored ? "scaleX(-1)" : undefined,
+            }}
+          />
+          {showOverlay && (
+            <Box
+              component="canvas"
+              ref={canvasRef}
+              sx={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                pointerEvents: "none",
+              }}
+            />
+          )}
+        </Box>
+      </Card>
+
       <canvas ref={captureRef} style={{ display: "none" }} />
-    </div>
+    </Stack>
   );
 }
