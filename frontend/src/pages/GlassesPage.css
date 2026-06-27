@@ -9,6 +9,30 @@
   -webkit-user-select: none;
 }
 
+.glasses-page--rokid {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+html.rokid-webview,
+html.rokid-webview body,
+body.glasses-body {
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+html.rokid-webview .glasses-camera__start {
+  background: #000;
+}
+
+html.rokid-webview .glasses-page__error-bar {
+  background: #000;
+  border-color: #39ff14;
+  color: #39ff14;
+}
+
 .glasses-page__hud-top {
   position: absolute;
   top: 0;
@@ -67,6 +91,24 @@
   opacity: 0.35;
 }
 
+.glasses-camera__video--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  transform: none;
+}
+
+.glasses-camera--boxes-only {
+  background: #000;
+}
+
+.glasses-camera--boxes-only .glasses-camera__overlay {
+  background: transparent;
+}
+
 .glasses-camera__overlay {
   position: absolute;
   inset: 0;
@@ -115,21 +157,6 @@
   color: #ff8888;
 }
 
-.glasses-camera__error {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 20;
-  background: rgba(255, 68, 68, 0.2);
-  border: 1px solid #ff4444;
-  color: #ff8888;
-  padding: 12px 20px;
-  border-radius: 12px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
 .glasses-page__name-panel {
   position: absolute;
   bottom: 0;
@@ -167,12 +194,6 @@
   color: #ffaaaa;
 }
 
-.glasses-page__idle {
-  font-size: 1.25rem;
-  opacity: 0.5;
-  color: #888;
-}
-
 .glasses-page__checkin {
   margin-top: 12px;
   display: inline-block;
@@ -190,6 +211,12 @@
 .glasses-page__checkin--flash {
   transform: scale(1.05);
   box-shadow: 0 0 24px rgba(57, 255, 20, 0.55);
+}
+
+.glasses-page__idle {
+  font-size: 1.25rem;
+  opacity: 0.5;
+  color: #888;
 }
 
 .glasses-page__hint {

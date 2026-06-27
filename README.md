@@ -83,14 +83,27 @@ chmod +x scripts/dev.sh
 ./scripts/dev.sh
 ```
 
-浏览器打开 **http://localhost:5173**
+浏览器打开 **https://localhost:5173**（摄像头需 HTTPS，自签名证书可继续访问）
+
+### 4. Rokid 眼镜 Android 套壳
+
+```bash
+./scripts/build-rokid-apk.sh
+adb install -r rokid-android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+详见 [rokid-android/README.md](rokid-android/README.md)。套壳 App 全屏加载 `/rokid?backend=电脑IP:8000`，电脑端可用 **Rokid 预览** 页（`/rokid-preview`）监视识别画面。
+
+HTTP 开发模式（部分 Android WebView 场景）：`DEV_HTTP=1 npm run dev` → http://localhost:5174
 
 ## 使用流程
 
-1. **录入学生**：进入「录入」页，拍摄 3–5 张不同角度照片，填写姓名/班级
-2. **实时识别**：进入「实时识别」页，摄像头画面中自动标注学生姓名
-3. **学生管理**：编辑、删除、重新录入人脸
-4. **AI 助手**（可选）：配置 LLM 后，可生成记忆口诀、查询档案
+1. **录入学生**：拍摄或上传照片，支持名牌 OCR 自动识别姓名
+2. **实时识别**：摄像头自动标注姓名，并自动记录考勤
+3. **考勤表**：查看/编辑每日出勤
+4. **学生管理**：编辑、删除、重新录入人脸
+5. **Rokid 眼镜**：App 内仅显示识别框；浏览器 `/rokid` 可预览姓名与打卡状态
+6. **AI 助手**（可选）：配置 LLM 后，可生成记忆口诀、查询档案
 
 ## LLM 配置（可选）
 
@@ -117,9 +130,12 @@ OLLAMA_MODEL=qwen2.5:7b
 | 路径 | 说明 |
 |------|------|
 | `GET /api/health` | GPU 状态、推理耗时 |
-| `WS /ws/recognize` | 实时人脸识别 |
+| `WS /ws/recognize` | 实时人脸识别 + 自动考勤 |
+| `WS /ws/preview` | Rokid 桌面预览广播 |
 | `GET/POST /api/students` | 学生 CRUD |
 | `POST /api/students/enroll` | 录入学生 + 人脸 |
+| `POST /api/ocr/name-tag` | 名牌 OCR 识别 |
+| `GET /api/attendance` | 考勤表 |
 | `POST /api/llm/chat` | AI 助手对话 |
 
 完整文档：http://localhost:8000/docs
