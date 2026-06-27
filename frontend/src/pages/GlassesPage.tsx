@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import { GlassesCamera, pickPrimaryFace } from "../components/GlassesCamera";
+import { GlassesCamera, pickCenterFace } from "../components/GlassesCamera";
 import { getBackendParam, isRokidWebView } from "../config/runtime";
 import { useRecognizeWebSocket } from "../hooks/useWebSocket";
 import "./GlassesPage.css";
@@ -9,9 +9,13 @@ export function GlassesPage() {
   const rokid = isRokidWebView();
   const [fps, setFps] = useState(8);
   const [gpuMode, setGpuMode] = useState(false);
+  const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
   const { connected, faces, inferenceMs, error, sendFrame } = useRecognizeWebSocket(true);
 
-  const primary = useMemo(() => pickPrimaryFace(faces), [faces]);
+  const primary = useMemo(
+    () => pickCenterFace(faces, frameSize.width, frameSize.height),
+    [faces, frameSize.width, frameSize.height],
+  );
   const isKnown = primary != null && primary.name !== "未知";
 
   useEffect(() => {
@@ -71,19 +75,30 @@ export function GlassesPage() {
         </div>
       )}
 
-      {error && <div className="glasses-page__error-bar">{error}</div>}
+      {error && !rokid && <div className="glasses-page__error-bar">{error}</div>}
 
       <GlassesCamera
         faces={faces}
         onFrame={sendFrame}
+        onFrameSize={(width, height) => setFrameSize({ width, height })}
         fps={fps}
         captureMaxWidth={rokid ? 480 : 640}
         captureQuality={rokid ? 0.5 : 0.6}
-        hideVideo
+        hideVideo={rokid}
+        hideOverlay={rokid}
         autoStart={rokid}
       />
 
-      {!rokid && (
+      {rokid ? (
+        <div className="glasses-page__center-hud" aria-live="polite">
+          <div className="glasses-page__crosshair" aria-hidden="true" />
+          {primary ? (
+            <div className={`glasses-page__center-name ${isKnown ? "" : "glasses-page__center-name--unknown"}`}>
+              {isKnown ? primary.name : "未知"}
+            </div>
+          ) : null}
+        </div>
+      ) : (
         <>
           <div className="glasses-page__name-panel">
             {primary ? (

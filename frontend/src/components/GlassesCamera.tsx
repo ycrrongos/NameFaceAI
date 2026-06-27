@@ -5,6 +5,7 @@ import { isRokidWebView } from "../config/runtime";
 
 interface GlassesCameraProps {
   onFrame?: (jpeg: ArrayBuffer) => void;
+  onFrameSize?: (width: number, height: number) => void;
   faces?: FaceMatch[];
   fps?: number;
   captureMaxWidth?: number;
@@ -13,16 +14,20 @@ interface GlassesCameraProps {
   hideVideo?: boolean;
   /** Rokid 套壳打开时自动开启摄像头 */
   autoStart?: boolean;
+  /** 不绘制人脸框（Rokid 仅显示中心姓名） */
+  hideOverlay?: boolean;
 }
 
 export function GlassesCamera({
   onFrame,
+  onFrameSize,
   faces = [],
   fps = 8,
   captureMaxWidth = 640,
   captureQuality = 0.6,
   hideVideo = false,
   autoStart = false,
+  hideOverlay = false,
 }: GlassesCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -108,6 +113,7 @@ export function GlassesCamera({
       if (!ctx) return;
       ctx.drawImage(video, 0, 0, drawW, drawH);
       captureSizeRef.current = { width: drawW, height: drawH };
+      onFrameSize?.(drawW, drawH);
       encodingRef.current = true;
       capture.toBlob(
         (blob) => {
@@ -119,10 +125,10 @@ export function GlassesCamera({
       );
     }, 1000 / fps);
     return () => clearInterval(interval);
-  }, [active, onFrame, fps, captureMaxWidth, captureQuality]);
+  }, [active, onFrame, onFrameSize, fps, captureMaxWidth, captureQuality]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || hideOverlay) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -180,7 +186,7 @@ export function GlassesCamera({
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [faces, active, hideVideo]);
+  }, [faces, active, hideVideo, hideOverlay]);
 
   return (
     <div ref={containerRef} className={`glasses-camera${hideVideo ? " glasses-camera--boxes-only" : ""}`}>
@@ -209,8 +215,30 @@ export function GlassesCamera({
   );
 }
 
-export function pickPrimaryFace(faces: FaceMatch[]): FaceMatch | null {
-  const known = faces.filter((f) => f.name !== "未知" && f.student_id != null);
-  if (known.length === 0) return faces[0] ?? null;
-  return known.reduce((best, f) => (f.confidence > best.confidence ? f : best));
+function faceCenterDistance(face: FaceMatch, frameW: number, frameH: number): number {
+  const [x1, y1, x2, y2] = face.bbox;
+  const fx = (x1 + x2) / 2;
+  const fy = (y1 + y2) / 2;
+  const cx = frameW / 2;
+  const cy = frameH / 2;
+  return (fx - cx) ** 2 + (fy - cy) ** 2;
+}
+
+/** 选取 bbox 中心最接近画面中心的人脸 */
+export function pickCenterFace(
+  faces: FaceMatch[],
+  frameW: number,
+  frameH: number,
+): FaceMatch | null {
+  if (faces.length === 0) return null;
+  if (frameW <= 0 || frameH <= 0) return faces[0] ?? null;
+
+  return faces.reduce<FaceMatch | null>((best, face) => {
+    if (!best) return face;
+    const dist = faceCenterDistance(face, frameW, frameH);
+    const bestDist = faceCenterDistance(best, frameW, frameH);
+    if (dist < bestDist) return face;
+    if (dist === bestDist && face.confidence > best.confidence) return face;
+    return best;
+  }, null);
 }
