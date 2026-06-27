@@ -9,6 +9,7 @@
   -webkit-user-select: none;
 }
 
+/* Rokid：不做 CSS 旋转（系统会统一旋转 WebView 与透视层；再 rotate 会导致框偏 90°） */
 .glasses-page--rokid {
   inset: 0;
   width: 100%;
@@ -91,6 +92,7 @@ html.rokid-webview .glasses-page__error-bar {
   opacity: 0.35;
 }
 
+/* 隐藏预览，摄像头仍在后台采集 */
 .glasses-camera__video--hidden {
   position: absolute;
   width: 1px;
@@ -155,6 +157,87 @@ html.rokid-webview .glasses-page__error-bar {
 
 .glasses-camera__hint--error {
   color: #ff8888;
+}
+
+.glasses-camera__error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  background: rgba(255, 68, 68, 0.2);
+  border: 1px solid #ff4444;
+  color: #ff8888;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.glasses-page__center-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  background: #000;
+}
+
+.glasses-page__crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.glasses-page__crosshair::before,
+.glasses-page__crosshair::after {
+  content: "";
+  position: absolute;
+  background: rgba(57, 255, 20, 0.75);
+  box-shadow: 0 0 10px rgba(57, 255, 20, 0.45);
+}
+
+.glasses-page__crosshair::before {
+  left: 50%;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  transform: translateX(-50%);
+}
+
+.glasses-page__crosshair::after {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.glasses-page__center-name {
+  position: absolute;
+  top: calc(50% + 44px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 92vw;
+  font-size: clamp(2.75rem, 14vw, 5rem);
+  font-weight: 700;
+  line-height: 1.05;
+  color: #39ff14;
+  text-shadow:
+    0 0 24px rgba(57, 255, 20, 0.75),
+    0 2px 8px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.08em;
+}
+
+.glasses-page__center-name--unknown {
+  color: #ff6666;
+  text-shadow:
+    0 0 20px rgba(255, 68, 68, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.9);
 }
 
 .glasses-page__name-panel {

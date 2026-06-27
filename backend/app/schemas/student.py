@@ -60,6 +60,8 @@ class HealthResponse(BaseModel):
     status: str
     gpu: bool
     accelerator: str  # gpu | igpu | cpu
+    accelerator_label: str
+    accelerator_note: str | None = None
     provider: str
     inference_ms: float | None
     model_loaded: bool

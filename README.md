@@ -83,7 +83,7 @@ chmod +x scripts/dev.sh
 ./scripts/dev.sh
 ```
 
-浏览器打开 **https://localhost:5173**（摄像头需 HTTPS，自签名证书可继续访问）
+浏览器打开 **https://localhost:5173**（摄像头需 HTTPS，自签名证书可继续访问；本地调试亦可用 `http://localhost:5173`）
 
 ### 4. Rokid 眼镜 Android 套壳
 
@@ -92,7 +92,7 @@ chmod +x scripts/dev.sh
 adb install -r rokid-android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-详见 [rokid-android/README.md](rokid-android/README.md)。套壳 App 全屏加载 `/rokid?backend=电脑IP:8000`，电脑端可用 **Rokid 预览** 页（`/rokid-preview`）监视识别画面。
+详见 [rokid-android/README.md](rokid-android/README.md)。套壳 App 全屏加载 `/rokid?backend=电脑IP:8000`（亦可在 App 设置中填写电脑 IP），App 内中央准星显示姓名；电脑端可用 **Rokid 预览** 页（`/rokid-preview`）监视识别画面，浏览器 `/rokid` 底部显示姓名与打卡状态。
 
 HTTP 开发模式（部分 Android WebView 场景）：`DEV_HTTP=1 npm run dev` → http://localhost:5174
 
@@ -102,7 +102,7 @@ HTTP 开发模式（部分 Android WebView 场景）：`DEV_HTTP=1 npm run dev` 
 2. **实时识别**：摄像头自动标注姓名，并自动记录考勤
 3. **考勤表**：查看/编辑每日出勤
 4. **学生管理**：编辑、删除、重新录入人脸
-5. **Rokid 眼镜**：App 内仅显示识别框；浏览器 `/rokid` 可预览姓名与打卡状态
+5. **Rokid 眼镜**：App WebView 中央准星显示姓名；浏览器 `/rokid` 底部显示姓名与打卡；可用 **Rokid 预览** 页监视画面
 6. **AI 助手**（可选）：配置 LLM 后，可生成记忆口诀、查询档案
 
 ## LLM 配置（可选）

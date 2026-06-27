@@ -18,6 +18,7 @@ interface GlassesCameraProps {
   captureMaxWidth?: number;
   captureQuality?: number;
   hideVideo?: boolean;
+  hideOverlay?: boolean;
   autoStart?: boolean;
   nativeCapture?: boolean;
   sourceFrameSize?: { width: number; height: number };
@@ -31,6 +32,7 @@ export function GlassesCamera({
   captureMaxWidth = 640,
   captureQuality = 0.6,
   hideVideo = false,
+  hideOverlay = false,
   autoStart = false,
   nativeCapture = false,
   sourceFrameSize,
@@ -196,7 +198,7 @@ export function GlassesCamera({
   }, [sourceFrameSize?.width, sourceFrameSize?.height]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || hideOverlay) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -257,7 +259,7 @@ export function GlassesCamera({
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [faces, active, hideVideo, nativeCapture, sourceFrameSize?.width, sourceFrameSize?.height]);
+  }, [faces, active, hideVideo, hideOverlay, nativeCapture, sourceFrameSize?.width, sourceFrameSize?.height]);
 
   return (
     <div ref={containerRef} className={`glasses-camera${hideVideo ? " glasses-camera--boxes-only" : ""}`}>

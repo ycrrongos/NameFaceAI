@@ -3,8 +3,8 @@ import { api } from "../api/client";
 import { GlassesCamera, pickCenterFace } from "../components/GlassesCamera";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { getBackendParam, isRokidNativeCamera, isRokidWebView } from "../config/runtime";
-import { useI18n } from "../i18n/I18nProvider";
 import { useRokidNativeRecognize } from "../hooks/useRokidNativeRecognize";
+import { useI18n } from "../i18n/I18nProvider";
 import { useRecognizeWebSocket } from "../hooks/useWebSocket";
 import "./GlassesPage.css";
 
@@ -12,6 +12,8 @@ export function GlassesPage() {
   const { t, faceName } = useI18n();
   const rokid = isRokidWebView();
   const nativeCamera = isRokidNativeCamera();
+  const showCenterHud = rokid && !nativeCamera;
+  const showBrowserPanel = !rokid && !nativeCamera;
   const [fps, setFps] = useState(8);
   const [gpuMode, setGpuMode] = useState(false);
   const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
@@ -92,7 +94,7 @@ export function GlassesPage() {
 
   return (
     <div className={`glasses-page${rokid ? " glasses-page--rokid" : ""}`}>
-      {!nativeCamera && (
+      {showBrowserPanel && (
         <div className="glasses-page__hud-top">
           <div className="glasses-page__status">
             <span className={`glasses-page__dot ${connected ? "glasses-page__dot--on" : "glasses-page__dot--warn"}`} />
@@ -106,7 +108,7 @@ export function GlassesPage() {
         </div>
       )}
 
-      {error && <div className="glasses-page__error-bar">{error}</div>}
+      {error && showBrowserPanel && <div className="glasses-page__error-bar">{error}</div>}
 
       <GlassesCamera
         faces={faces}
@@ -114,14 +116,26 @@ export function GlassesPage() {
         onFrameSize={(width, height) => setFrameSize({ width, height })}
         sourceFrameSize={frameSize}
         fps={fps}
-        captureMaxWidth={nativeCamera ? 960 : 640}
-        captureQuality={nativeCamera ? 0.55 : 0.6}
-        hideVideo={nativeCamera}
-        autoStart={!nativeCamera}
+        captureMaxWidth={nativeCamera ? 960 : rokid ? 480 : 640}
+        captureQuality={nativeCamera ? 0.55 : rokid ? 0.5 : 0.6}
+        hideVideo={nativeCamera || rokid}
+        hideOverlay={showCenterHud}
+        autoStart={!nativeCamera && (rokid || showBrowserPanel)}
         nativeCapture={nativeCamera}
       />
 
-      {!nativeCamera && (
+      {showCenterHud && (
+        <div className="glasses-page__center-hud" aria-live="polite">
+          <div className="glasses-page__crosshair" aria-hidden="true" />
+          {primary ? (
+            <div className={`glasses-page__center-name ${isKnown ? "" : "glasses-page__center-name--unknown"}`}>
+              {isKnown ? primary.name : faceName("未知")}
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {showBrowserPanel && (
         <>
           <div className="glasses-page__name-panel">
             {primary ? (
