@@ -19,9 +19,13 @@ class RokidJsBridge(private val webView: WebView) {
 
     fun pushRecognizeResult(json: JSONObject) {
         val b64 = Base64.encodeToString(json.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        // atob() alone corrupts UTF-8; decode bytes with TextDecoder before JSON.parse
         val script =
-            "window.NameFaceRokid&&window.NameFaceRokid.onRecognizeResult&&" +
-                "window.NameFaceRokid.onRecognizeResult(JSON.parse(atob('$b64')));"
+            "(function(){var b=atob('$b64');var u=new Uint8Array(b.length);" +
+                "for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);" +
+                "var d=JSON.parse(new TextDecoder('utf-8').decode(u));" +
+                "window.NameFaceRokid&&window.NameFaceRokid.onRecognizeResult&&" +
+                "window.NameFaceRokid.onRecognizeResult(d);})();"
         webView.post { webView.evaluateJavascript(script, null) }
     }
 

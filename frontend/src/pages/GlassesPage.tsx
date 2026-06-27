@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import "@fontsource/noto-sans-sc/chinese-simplified-400.css";
+import "@fontsource/noto-sans-sc/chinese-simplified-700.css";
 import { api } from "../api/client";
 import { GlassesCamera, pickCenterFace } from "../components/GlassesCamera";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
@@ -126,12 +128,14 @@ export function GlassesPage() {
 
       {showCenterHud && (
         <div className="glasses-page__center-hud" aria-live="polite">
-          <div className="glasses-page__crosshair" aria-hidden="true" />
-          {primary ? (
-            <div className={`glasses-page__center-name ${isKnown ? "" : "glasses-page__center-name--unknown"}`}>
-              {isKnown ? primary.name : faceName("未知")}
-            </div>
-          ) : null}
+          <div className="glasses-page__reticle-wrap">
+            <div className="glasses-page__reticle" aria-hidden="true" />
+            {primary ? (
+              <div className={`glasses-page__center-name ${isKnown ? "" : "glasses-page__center-name--unknown"}`}>
+                {isKnown ? primary.name : faceName("未知")}
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
 

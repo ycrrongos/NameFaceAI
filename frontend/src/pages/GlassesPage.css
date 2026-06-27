@@ -3,7 +3,7 @@
   inset: 0;
   background: #000;
   color: #39ff14;
-  font-family: "Noto Sans SC", "Roboto", sans-serif;
+  font-family: "Noto Sans SC", "Droid Sans Fallback", "sans-serif";
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
@@ -182,45 +182,29 @@ html.rokid-webview .glasses-page__error-bar {
   background: #000;
 }
 
-.glasses-page__crosshair {
+.glasses-page__reticle-wrap {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 56px;
-  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
   transform: translate(-50%, -50%);
+}
+
+.glasses-page__reticle {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border: 2px solid rgba(57, 255, 20, 0.75);
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(57, 255, 20, 0.45);
   pointer-events: none;
 }
 
-.glasses-page__crosshair::before,
-.glasses-page__crosshair::after {
-  content: "";
-  position: absolute;
-  background: rgba(57, 255, 20, 0.75);
-  box-shadow: 0 0 10px rgba(57, 255, 20, 0.45);
-}
-
-.glasses-page__crosshair::before {
-  left: 50%;
-  top: 0;
-  width: 2px;
-  height: 100%;
-  transform: translateX(-50%);
-}
-
-.glasses-page__crosshair::after {
-  top: 50%;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  transform: translateY(-50%);
-}
-
 .glasses-page__center-name {
-  position: absolute;
-  top: calc(50% + 44px);
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
   width: max-content;
   max-width: 92vw;
   font-size: clamp(2.75rem, 14vw, 5rem);
@@ -231,6 +215,7 @@ html.rokid-webview .glasses-page__error-bar {
     0 0 24px rgba(57, 255, 20, 0.75),
     0 2px 8px rgba(0, 0, 0, 0.9);
   letter-spacing: 0.08em;
+  text-align: center;
 }
 
 .glasses-page__center-name--unknown {
