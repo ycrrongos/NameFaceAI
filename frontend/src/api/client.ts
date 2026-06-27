@@ -28,6 +28,8 @@ export interface RecognizeResult {
   faces: FaceMatch[];
   inference_ms: number;
   attendance?: AttendanceCheckIn[];
+  frame_width?: number | null;
+  frame_height?: number | null;
 }
 
 export interface HealthInfo {
@@ -37,6 +39,8 @@ export interface HealthInfo {
   provider: string;
   inference_ms: number | null;
   model_loaded: boolean;
+  face_model_name?: string | null;
+  face_det_size?: number | null;
   llm_provider: string | null;
 }
 

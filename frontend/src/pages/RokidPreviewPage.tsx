@@ -59,7 +59,7 @@ function drawOverlay(
 
 export function RokidPreviewPage() {
   const { t, faceName } = useI18n();
-  const { connected, preview, error, frameCount, resetStats } = useRokidPreview(true);
+  const { connected, preview, error, frameCount, stale, resetStats } = useRokidPreview(true);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const unknownLabel = faceName("未知");
@@ -108,6 +108,10 @@ export function RokidPreviewPage() {
       {error && <Alert severity="error">{error}</Alert>}
 
       {!preview && connected && <Alert severity="info">{t("rokidPreview.waitingFrame")}</Alert>}
+
+      {stale && preview && (
+        <Alert severity="warning">{t("rokidPreview.staleFrames")}</Alert>
+      )}
 
       {!connected && <Alert severity="warning">{t("rokidPreview.notConnected")}</Alert>}
 

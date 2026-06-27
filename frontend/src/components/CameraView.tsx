@@ -18,6 +18,7 @@ import { useI18n } from "../i18n/I18nProvider";
 import {
   getCameraErrorRef,
   isSecureEnoughForCamera,
+  mapFaceBboxToOverlay,
   openCameraStream,
   type CameraErrorRef,
 } from "../utils/cameraUtils";
@@ -33,6 +34,8 @@ interface CameraViewProps {
   requireUserGesture?: boolean;
   /** MJPEG 地址（?camera=phone + phone-mjpeg-bridge.sh） */
   streamUrl?: string | null;
+  /** 后端返回的帧尺寸，用于检测框坐标映射 */
+  sourceFrameSize?: { width: number; height: number };
 }
 
 export function CameraView({
@@ -45,6 +48,7 @@ export function CameraView({
   mirrored = true,
   requireUserGesture = false,
   streamUrl = null,
+  sourceFrameSize,
 }: CameraViewProps) {
   const { t, faceName } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -52,6 +56,11 @@ export function CameraView({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const captureRef = useRef<HTMLCanvasElement>(null);
   const captureSizeRef = useRef({ width: 0, height: 0 });
+  const facesRef = useRef(faces);
+  facesRef.current = faces;
+  const onFrameRef = useRef(onFrame);
+  onFrameRef.current = onFrame;
+  const encodingRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string>("");
@@ -61,6 +70,7 @@ export function CameraView({
   const useStream = Boolean(streamUrl);
 
   const cameraError = cameraErrorRef ? t(cameraErrorRef.key, cameraErrorRef.params) : null;
+  const { hostname, port } = window.location;
 
   const frameReady = useCallback(() => {
     if (useStream) {
@@ -94,7 +104,6 @@ export function CameraView({
         return;
       }
       if (!isSecureEnoughForCamera()) {
-        const { hostname, port } = window.location;
         setCameraErrorRef({ key: "camera.insecureAccess", params: { hostname, port } });
         return;
       }
@@ -123,7 +132,7 @@ export function CameraView({
         setStarting(false);
       }
     },
-    [stopStream],
+    [hostname, port, stopStream],
   );
 
   useEffect(() => {
@@ -170,10 +179,10 @@ export function CameraView({
   }, [deviceId, requireUserGesture, startCamera, stopStream, useStream]);
 
   useEffect(() => {
-    if (!active || !onFrame) return;
+    if (!active || !onFrameRef.current) return;
     const interval = setInterval(() => {
       const capture = captureRef.current;
-      if (!capture || !frameReady()) return;
+      if (!capture || !frameReady() || encodingRef.current) return;
       const source = useStream ? imgRef.current : videoRef.current;
       if (!source) return;
 
@@ -193,58 +202,77 @@ export function CameraView({
       if (!ctx) return;
       ctx.drawImage(source, 0, 0, drawW, drawH);
       captureSizeRef.current = { width: drawW, height: drawH };
+      encodingRef.current = true;
       capture.toBlob(
         (blob) => {
-          if (blob) blob.arrayBuffer().then(onFrame);
+          encodingRef.current = false;
+          if (blob) {
+            void blob.arrayBuffer().then((buf) => onFrameRef.current?.(buf));
+          }
         },
         "image/jpeg",
         captureQuality,
       );
     }, 1000 / fps);
     return () => clearInterval(interval);
-  }, [active, onFrame, fps, captureMaxWidth, captureQuality, frameReady, frameSize, useStream]);
+  }, [active, fps, captureMaxWidth, captureQuality, frameReady, frameSize, useStream]);
+
+  useEffect(() => {
+    if (sourceFrameSize && sourceFrameSize.width > 0 && sourceFrameSize.height > 0) {
+      captureSizeRef.current = sourceFrameSize;
+    }
+  }, [sourceFrameSize?.width, sourceFrameSize?.height]);
 
   useEffect(() => {
     if (!showOverlay || !active) return;
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const display = useStream ? imgRef.current : videoRef.current;
+    if (!canvas || !display) return;
 
     let raf: number;
     const draw = () => {
       if (frameReady()) {
-        const display = useStream ? imgRef.current : videoRef.current;
-        canvas.width = display?.clientWidth ?? canvas.clientWidth;
-        canvas.height = display?.clientHeight ?? canvas.clientHeight;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          const srcW = captureSizeRef.current.width || frameSize().w;
-          const srcH = captureSizeRef.current.height || frameSize().h;
-          const scaleX = canvas.width / srcW;
-          const scaleY = canvas.height / srcH;
+        const cw = display.clientWidth;
+        const ch = display.clientHeight;
+        if (cw >= 1 && ch >= 1) {
+          if (canvas.width !== cw || canvas.height !== ch) {
+            canvas.width = cw;
+            canvas.height = ch;
+          }
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const srcW =
+              sourceFrameSize?.width || captureSizeRef.current.width || frameSize().w;
+            const srcH =
+              sourceFrameSize?.height || captureSizeRef.current.height || frameSize().h;
+            if (srcW > 0 && srcH > 0) {
+              for (const face of facesRef.current) {
+                const { left, top, width, height } = mapFaceBboxToOverlay(
+                  face.bbox,
+                  srcW,
+                  srcH,
+                  canvas.width,
+                  canvas.height,
+                  { objectFit: "cover", mirrored },
+                );
+                const isKnown = face.name !== "未知";
+                ctx.strokeStyle = isKnown ? "#39FF14" : "#FF4444";
+                ctx.lineWidth = 3;
+                ctx.strokeRect(left, top, width, height);
 
-          for (const face of faces) {
-            const [x1, y1, x2, y2] = face.bbox;
-            let left = x1 * scaleX;
-            const top = y1 * scaleY;
-            let width = (x2 - x1) * scaleX;
-            const height = (y2 - y1) * scaleY;
-            if (mirrored) left = canvas.width - left - width;
-
-            const isKnown = face.name !== "未知";
-            ctx.strokeStyle = isKnown ? "#386A20" : "#B3261E";
-            ctx.lineWidth = 3;
-            ctx.strokeRect(left, top, width, height);
-
-            const label = `${faceName(face.name)}  ${(face.confidence * 100).toFixed(0)}%`;
-            ctx.font = "600 22px Roboto, Noto Sans SC, sans-serif";
-            const textWidth = ctx.measureText(label).width + 20;
-            ctx.fillStyle = isKnown ? "#386A20" : "#B3261E";
-            ctx.beginPath();
-            ctx.roundRect(left, top - 36, textWidth, 32, 8);
-            ctx.fill();
-            ctx.fillStyle = "#fff";
-            ctx.fillText(label, left + 10, top - 12);
+                const label = isKnown
+                  ? `${faceName(face.name)}  ${(face.confidence * 100).toFixed(0)}%`
+                  : `?  ${(face.confidence * 100).toFixed(0)}%`;
+                ctx.font = "600 22px Roboto, Noto Sans SC, sans-serif";
+                const textWidth = ctx.measureText(label).width + 20;
+                const labelTop = Math.max(top - 36, 0);
+                ctx.fillStyle = isKnown ? "rgba(57,255,20,0.9)" : "rgba(255,68,68,0.9)";
+                ctx.fillRect(left, labelTop, textWidth, 32);
+                ctx.fillStyle = isKnown ? "#000" : "#fff";
+                ctx.fillText(label, left + 10, labelTop + 22);
+              }
+            }
           }
         }
       }
@@ -252,12 +280,10 @@ export function CameraView({
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [faces, showOverlay, mirrored, active, frameReady, frameSize, useStream, faceName]);
+  }, [showOverlay, mirrored, active, frameReady, frameSize, useStream, sourceFrameSize?.width, sourceFrameSize?.height, faceName]);
 
   const showStartButton =
     !useStream && !active && (requireUserGesture || !isSecureEnoughForCamera() || cameraErrorRef);
-
-  const { hostname, port } = window.location;
 
   return (
     <Stack spacing={2}>
@@ -350,7 +376,14 @@ export function CameraView({
             <Box
               component="canvas"
               ref={canvasRef}
-              sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}
+              sx={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                pointerEvents: "none",
+                zIndex: 2,
+              }}
             />
           )}
           {showStartButton && (

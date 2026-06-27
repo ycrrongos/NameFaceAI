@@ -20,6 +20,8 @@ def health() -> HealthResponse:
             provider="none",
             inference_ms=None,
             model_loaded=False,
+            face_model_name=settings.face_model_name,
+            face_det_size=settings.face_det_size,
             llm_provider=settings.llm_provider or None,
         )
 
@@ -38,5 +40,7 @@ def health() -> HealthResponse:
         provider=face_service.provider,
         inference_ms=inference_ms,
         model_loaded=face_service.model_loaded,
+        face_model_name=settings.face_model_name,
+        face_det_size=settings.face_det_size,
         llm_provider=settings.llm_provider or None,
     )

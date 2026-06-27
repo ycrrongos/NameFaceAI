@@ -160,6 +160,7 @@ export const zh = {
     frameInterval: "帧间隔 {{ms}} ms",
     previewFps: "预览 FPS {{fps}}",
     frameCount: "累计 {{count}} 帧",
+    staleFrames: "超过 5 秒未收到新帧，请检查眼镜是否在线、后端 TCP 8001 是否可达。",
   },
   glasses: {
     statusOn: "识别 · 自动考勤",

@@ -12,8 +12,8 @@ android {
         applicationId = "com.nameface.rokid"
         minSdk = 26
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.0.12"
+        versionCode = 16
+        versionName = "1.0.15"
     }
 
     buildTypes {

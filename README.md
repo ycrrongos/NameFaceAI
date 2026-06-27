@@ -66,7 +66,7 @@ cp .env.example .env        # 可选：配置 LLM
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-首次启动会自动下载 InsightFace `buffalo_l` 模型（约 300MB）到 `~/.insightface/models/`。
+首次启动会自动下载 InsightFace `buffalo_l` 模型（约 326MB）到 `~/.insightface/models/`。
 
 ### 2. 前端
 
@@ -152,15 +152,18 @@ OLLAMA_MODEL=qwen2.5:7b
 - 数据库：`data/nameface.db`
 - 人脸缩略图：`data/faces/{student_id}/`
 
-默认使用 `buffalo_l` 模型（SCRFD-10G 检测器，适合教室远距多人识别），可在 `backend/.env` 调整：
+默认使用 `buffalo_l`（SCRFD-10G + ResNet50，`det_size=960`，远距与速度兼顾），可在 `backend/.env` 调整：
 
 ```env
 FACE_MODEL_NAME=buffalo_l
-FACE_DET_SIZE=640
-FACE_DET_THRESH=0.4
+FACE_DET_SIZE=960
+FACE_DET_THRESH=0.35
+FACE_MIN_IMAGE_SIZE=720
 FACE_MAX_IMAGE_SIZE=1280
 FACE_MATCH_THRESHOLD=0.45
 ```
+
+需要更高精度可改用 `antelopev2` + `FACE_DET_SIZE=1280`（约慢一倍）。切换模型后需重新录入人脸。
 
 ## 识别阈值
 

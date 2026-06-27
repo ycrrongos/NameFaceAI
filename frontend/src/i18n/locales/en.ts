@@ -164,6 +164,7 @@ export const en: TranslationDict = {
     frameInterval: "Frame interval {{ms}} ms",
     previewFps: "Preview FPS {{fps}}",
     frameCount: "{{count}} frames total",
+    staleFrames: "No new frames for 5+ seconds. Check glasses connectivity and backend TCP port 8001.",
   },
   glasses: {
     statusOn: "Recognition · auto attendance",

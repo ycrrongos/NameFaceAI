@@ -17,5 +17,8 @@
     <string name="discover_no_network">未连接 WiFi，无法自动搜索</string>
     <string name="page_load_failed">页面加载失败，正在重新搜索服务器…</string>
     <string name="camera_permission_denied">需要摄像头权限才能识别人脸</string>
+    <string name="stream_notification_channel">画面推流</string>
+    <string name="stream_notification_title">NameFace 识别推流中</string>
+    <string name="stream_notification_text">正在向电脑持续传输画面</string>
     <string name="ssl_error">SSL 证书校验失败，可在设置中开启「信任自签名证书」</string>
 </resources>

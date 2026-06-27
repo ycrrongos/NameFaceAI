@@ -19,6 +19,8 @@ interface GlassesCameraProps {
   captureQuality?: number;
   hideVideo?: boolean;
   autoStart?: boolean;
+  nativeCapture?: boolean;
+  sourceFrameSize?: { width: number; height: number };
 }
 
 export function GlassesCamera({
@@ -30,6 +32,8 @@ export function GlassesCamera({
   captureQuality = 0.6,
   hideVideo = false,
   autoStart = false,
+  nativeCapture = false,
+  sourceFrameSize,
 }: GlassesCameraProps) {
   const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -39,6 +43,8 @@ export function GlassesCamera({
   const captureSizeRef = useRef({ width: 0, height: 0 });
   const encodingRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
+  const mountGenRef = useRef(0);
+  const startInFlightRef = useRef(false);
   const [cameraErrorRef, setCameraErrorRef] = useState<CameraErrorRef | null>(null);
   const [starting, setStarting] = useState(false);
   const [active, setActive] = useState(false);
@@ -53,7 +59,39 @@ export function GlassesCamera({
     setActive(false);
   }, []);
 
+  const playVideo = useCallback(async (video: HTMLVideoElement) => {
+    video.playsInline = true;
+    video.muted = true;
+    if (video.readyState < 1) {
+      await new Promise<void>((resolve, reject) => {
+        const onReady = () => {
+          video.removeEventListener("loadedmetadata", onReady);
+          video.removeEventListener("error", onError);
+          resolve();
+        };
+        const onError = () => {
+          video.removeEventListener("loadedmetadata", onReady);
+          video.removeEventListener("error", onError);
+          reject(new Error("video load failed"));
+        };
+        video.addEventListener("loadedmetadata", onReady, { once: true });
+        video.addEventListener("error", onError, { once: true });
+      });
+    }
+    try {
+      await video.play();
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        await new Promise((r) => window.setTimeout(r, 50));
+        await video.play();
+        return;
+      }
+      throw err;
+    }
+  }, []);
+
   const startCamera = useCallback(async () => {
+    if (startInFlightRef.current) return;
     if (!navigator.mediaDevices?.getUserMedia) {
       const insecure = typeof window !== "undefined" && window.location.protocol === "http:";
       setCameraErrorRef({
@@ -65,39 +103,60 @@ export function GlassesCamera({
       setCameraErrorRef({ key: "glasses.cameraOpenHttps", params: { hostname, port } });
       return;
     }
+
+    const gen = mountGenRef.current;
+    startInFlightRef.current = true;
     setStarting(true);
     setCameraErrorRef(null);
     stopStream();
     try {
       const stream = await openCameraStream();
+      if (gen !== mountGenRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
       const video = videoRef.current;
-      if (!video) return;
+      if (!video || gen !== mountGenRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       video.srcObject = stream;
-      video.playsInline = true;
-      video.muted = true;
-      await video.play();
+      await playVideo(video);
+      if (gen !== mountGenRef.current) return;
       setActive(true);
     } catch (err) {
+      if (gen !== mountGenRef.current) return;
       stopStream();
       setCameraErrorRef(getCameraErrorRef(err));
     } finally {
-      setStarting(false);
+      startInFlightRef.current = false;
+      if (gen === mountGenRef.current) setStarting(false);
     }
-  }, [hostname, port, stopStream]);
+  }, [hostname, port, stopStream, playVideo]);
 
   useEffect(() => {
-    return () => stopStream();
+    mountGenRef.current += 1;
+    return () => {
+      mountGenRef.current += 1;
+      startInFlightRef.current = false;
+      stopStream();
+    };
   }, [stopStream]);
 
   useEffect(() => {
-    if (autoStart && !active && !starting && !cameraErrorRef) {
+    if (nativeCapture) {
+      setActive(true);
+      setCameraErrorRef(null);
+      return;
+    }
+    if (autoStart && !active && !starting && !cameraErrorRef && !startInFlightRef.current) {
       void startCamera();
     }
-  }, [autoStart, active, starting, cameraErrorRef, startCamera]);
+  }, [nativeCapture, autoStart, active, starting, cameraErrorRef, startCamera]);
 
   useEffect(() => {
-    if (!active || !onFrame) return;
+    if (!active || !onFrame || nativeCapture) return;
     const interval = setInterval(() => {
       const video = videoRef.current;
       const capture = captureRef.current;
@@ -128,7 +187,13 @@ export function GlassesCamera({
       );
     }, 1000 / fps);
     return () => clearInterval(interval);
-  }, [active, onFrame, onFrameSize, fps, captureMaxWidth, captureQuality]);
+  }, [active, onFrame, onFrameSize, fps, captureMaxWidth, captureQuality, nativeCapture]);
+
+  useEffect(() => {
+    if (sourceFrameSize && sourceFrameSize.width > 0 && sourceFrameSize.height > 0) {
+      captureSizeRef.current = sourceFrameSize;
+    }
+  }, [sourceFrameSize?.width, sourceFrameSize?.height]);
 
   useEffect(() => {
     if (!active) return;
@@ -139,49 +204,52 @@ export function GlassesCamera({
 
     let raf: number;
     const draw = () => {
-      if (video.readyState >= 2) {
+      const srcW =
+        captureSizeRef.current.width || sourceFrameSize?.width || video.videoWidth;
+      const srcH =
+        captureSizeRef.current.height || sourceFrameSize?.height || video.videoHeight;
+      const canDraw =
+        (nativeCapture || hideVideo || video.readyState >= 2) && srcW > 0 && srcH > 0;
+
+      if (canDraw) {
         const rect = hideVideo
           ? container.getBoundingClientRect()
           : video.getBoundingClientRect();
         const w = Math.round(rect.width) || container.clientWidth;
         const h = Math.round(rect.height) || container.clientHeight;
-        if (w < 1 || h < 1) {
-          raf = requestAnimationFrame(draw);
-          return;
-        }
-        if (canvas.width !== w || canvas.height !== h) {
-          canvas.width = w;
-          canvas.height = h;
-        }
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          const srcW = captureSizeRef.current.width || video.videoWidth;
-          const srcH = captureSizeRef.current.height || video.videoHeight;
-          const overlayFit = hideVideo ? "fill" : "cover";
+        if (w >= 1 && h >= 1) {
+          if (canvas.width !== w || canvas.height !== h) {
+            canvas.width = w;
+            canvas.height = h;
+          }
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const overlayFit = hideVideo ? "fill" : "cover";
 
-          for (const face of faces) {
-            const { left, top, width, height } = mapFaceBboxToOverlay(
-              face.bbox,
-              srcW,
-              srcH,
-              canvas.width,
-              canvas.height,
-              { objectFit: overlayFit, mirrored: !hideVideo },
-            );
-            const known = face.name !== "未知";
+            for (const face of faces) {
+              const { left, top, width, height } = mapFaceBboxToOverlay(
+                face.bbox,
+                srcW,
+                srcH,
+                canvas.width,
+                canvas.height,
+                { objectFit: overlayFit, mirrored: !hideVideo },
+              );
+              const known = face.name !== "未知";
 
-            ctx.strokeStyle = known ? "#39FF14" : "#FF4444";
-            ctx.lineWidth = 4;
-            ctx.strokeRect(left, top, width, height);
+              ctx.strokeStyle = known ? "#39FF14" : "#FF4444";
+              ctx.lineWidth = 4;
+              ctx.strokeRect(left, top, width, height);
 
-            const label = known ? face.name : "?";
-            ctx.font = "700 28px 'Noto Sans SC', sans-serif";
-            const tw = ctx.measureText(label).width + 24;
-            ctx.fillStyle = known ? "rgba(57,255,20,0.85)" : "rgba(255,68,68,0.85)";
-            ctx.fillRect(left, top - 40, tw, 36);
-            ctx.fillStyle = known ? "#000" : "#fff";
-            ctx.fillText(label, left + 12, top - 12);
+              const label = known ? face.name : "?";
+              ctx.font = "700 28px 'Noto Sans SC', sans-serif";
+              const tw = ctx.measureText(label).width + 24;
+              ctx.fillStyle = known ? "rgba(57,255,20,0.85)" : "rgba(255,68,68,0.85)";
+              ctx.fillRect(left, top - 40, tw, 36);
+              ctx.fillStyle = known ? "#000" : "#fff";
+              ctx.fillText(label, left + 12, top - 12);
+            }
           }
         }
       }
@@ -189,11 +257,11 @@ export function GlassesCamera({
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [faces, active, hideVideo]);
+  }, [faces, active, hideVideo, nativeCapture, sourceFrameSize?.width, sourceFrameSize?.height]);
 
   return (
     <div ref={containerRef} className={`glasses-camera${hideVideo ? " glasses-camera--boxes-only" : ""}`}>
-      {!active && (
+      {!active && !nativeCapture && (
         <div className="glasses-camera__start">
           {!isSecureEnoughForCamera() && (
             <p className="glasses-camera__hint">

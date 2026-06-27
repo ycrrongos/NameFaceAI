@@ -26,7 +26,8 @@ export function RecognizePage() {
   const [fps, setFps] = useState(10);
   const [gpuMode, setGpuMode] = useState(false);
   const [health, setHealth] = useState<string>("");
-  const { connected, faces, attendance, inferenceMs, error, sendFrame } = useRecognizeWebSocket(true);
+  const { connected, faces, attendance, inferenceMs, error, sendFrame, frameSize } =
+    useRecognizeWebSocket(true);
 
   useEffect(() => {
     api.health().then((h) => {
@@ -37,7 +38,9 @@ export function RecognizePage() {
             ? t("recognize.accelIgpu")
             : t("recognize.accelCpu");
       setGpuMode(h.gpu);
-      setHealth(`${accel} · ${h.provider}`);
+      setHealth(
+        `${h.face_model_name ?? "模型"}@${h.face_det_size ?? "?"} · ${accel} · ${h.provider}`,
+      );
       if (h.gpu) setFps(12);
       else if (h.inference_ms != null) {
         const interval = Math.max(h.inference_ms * 1.5, 300);
@@ -76,6 +79,9 @@ export function RecognizePage() {
                 variant="outlined"
               />
             )}
+            {connected && inferenceMs == null && (
+              <Chip label="等待推理…" color="warning" variant="outlined" />
+            )}
             {faces.length > 0 && (
               <Chip
                 label={t("recognize.facesDetected", { count: faces.length })}
@@ -99,6 +105,7 @@ export function RecognizePage() {
         captureMaxWidth={1280}
         captureQuality={0.75}
         streamUrl={getPhoneCameraStreamUrl()}
+        sourceFrameSize={frameSize}
       />
 
       <Box>

@@ -52,6 +52,8 @@ class RecognizeResponse(BaseModel):
     faces: list[FaceMatch]
     inference_ms: float
     attendance: list[AttendanceCheckIn] = []
+    frame_width: int | None = None
+    frame_height: int | None = None
 
 
 class HealthResponse(BaseModel):
@@ -61,6 +63,8 @@ class HealthResponse(BaseModel):
     provider: str
     inference_ms: float | None
     model_loaded: bool
+    face_model_name: str | None = None
+    face_det_size: int | None = None
     llm_provider: str | None
 
 
