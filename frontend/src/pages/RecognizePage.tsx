@@ -5,17 +5,36 @@ import { CameraView } from "../components/CameraView";
 import { useRecognizeWebSocket } from "../hooks/useWebSocket";
 
 export function RecognizePage() {
-  const [fps, setFps] = useState(12);
+  const [fps, setFps] = useState(10);
+  const [gpuMode, setGpuMode] = useState(false);
   const [health, setHealth] = useState<string>("");
   const { connected, faces, inferenceMs, error, sendFrame } = useRecognizeWebSocket(true);
 
   useEffect(() => {
     api.health().then((h) => {
-      const gpu = h.gpu ? "GPU" : "CPU";
-      setHealth(`${gpu} · ${h.provider} · ${h.inference_ms?.toFixed(0) ?? "?"}ms`);
-      if (h.inference_ms != null && h.inference_ms < 50) setFps(15);
+      const accel =
+        h.accelerator === "gpu" ? "独显" : h.accelerator === "igpu" ? "集显" : "CPU";
+      setGpuMode(h.gpu);
+      setHealth(`${accel} · ${h.provider} · ${h.inference_ms?.toFixed(0) ?? "?"}ms`);
+      if (h.gpu) {
+        setFps(12);
+      } else if (h.inference_ms != null) {
+        const interval = Math.max(h.inference_ms * 1.5, 300);
+        setFps(Math.min(5, Math.max(1, Math.round(1000 / interval))));
+      }
     });
   }, []);
+
+  useEffect(() => {
+    if (inferenceMs == null) return;
+    if (gpuMode) {
+      const interval = Math.max(inferenceMs * 1.2, 50);
+      setFps(Math.min(15, Math.max(8, Math.round(1000 / interval))));
+    } else {
+      const interval = Math.max(inferenceMs * 1.5, 300);
+      setFps(Math.min(5, Math.max(1, Math.round(1000 / interval))));
+    }
+  }, [inferenceMs, gpuMode]);
 
   return (
     <div className="page">
@@ -29,7 +48,7 @@ export function RecognizePage() {
 
       {error && <p className="error">{error}</p>}
 
-      <CameraView faces={faces} onFrame={sendFrame} fps={fps} />
+      <CameraView faces={faces} onFrame={sendFrame} fps={fps} captureMaxWidth={1280} captureQuality={0.75} />
 
       <div className="actions">
         <Link to="/enroll" className="btn btn-primary">

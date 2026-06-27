@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     database_url: str = f"sqlite:///{DATA_DIR / 'nameface.db'}"
+    # Classroom / multi-student (distant faces): buffalo_l + det 640 + high resolution
+    # Lightweight CPU-only: buffalo_sc + det 320 + max_image 480
+    face_model_name: str = "buffalo_l"
+    face_det_size: int = 640
+    face_det_thresh: float = 0.4
+    face_max_image_size: int = 1280
     face_match_threshold: float = 0.45
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 

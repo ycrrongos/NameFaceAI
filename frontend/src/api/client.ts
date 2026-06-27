@@ -24,6 +24,7 @@ export interface RecognizeResult {
 export interface HealthInfo {
   status: string;
   gpu: boolean;
+  accelerator: "gpu" | "igpu" | "cpu";
   provider: string;
   inference_ms: number | null;
   model_loaded: boolean;

@@ -10,6 +10,7 @@ interface RecognizeMessage {
 
 export function useRecognizeWebSocket(enabled: boolean) {
   const wsRef = useRef<WebSocket | null>(null);
+  const busyRef = useRef(false);
   const [connected, setConnected] = useState(false);
   const [faces, setFaces] = useState<FaceMatch[]>([]);
   const [inferenceMs, setInferenceMs] = useState<number | null>(null);
@@ -29,6 +30,7 @@ export function useRecognizeWebSocket(enabled: boolean) {
     ws.onerror = () => setError("WebSocket 连接失败");
     ws.onmessage = (event) => {
       const data: RecognizeMessage = JSON.parse(event.data);
+      busyRef.current = false;
       if (data.error) {
         setError(data.error);
         return;
@@ -43,10 +45,11 @@ export function useRecognizeWebSocket(enabled: boolean) {
     };
   }, [enabled]);
 
-  const sendFrame = useCallback((frameBase64: string) => {
+  const sendFrame = useCallback((jpeg: ArrayBuffer) => {
     const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    ws.send(JSON.stringify({ frame: frameBase64 }));
+    if (!ws || ws.readyState !== WebSocket.OPEN || busyRef.current) return;
+    busyRef.current = true;
+    ws.send(jpeg);
   }, []);
 
   return { connected, faces, inferenceMs, error, sendFrame };

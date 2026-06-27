@@ -8,6 +8,14 @@ from sqlalchemy.orm import Session
 
 from app.config import FACES_DIR, PROJECT_ROOT, settings
 
+# Discrete GPU → integrated GPU → CPU
+_PROVIDER_PRIORITY: list[tuple[str, str]] = [
+    ("CUDAExecutionProvider", "gpu"),  # NVIDIA discrete
+    ("ROCMExecutionProvider", "gpu"),  # AMD discrete
+    ("OpenVINOExecutionProvider", "igpu"),  # Intel integrated
+    ("DmlExecutionProvider", "igpu"),  # Windows GPU (integrated or discrete)
+]
+
 
 @dataclass
 class FaceResult:
@@ -27,6 +35,7 @@ class FaceService:
     def __init__(self) -> None:
         self._app: FaceAnalysis | None = None
         self.provider = "CPUExecutionProvider"
+        self.accelerator = "cpu"  # gpu | igpu | cpu
         self.gpu = False
         self._last_inference_ms: float | None = None
 
@@ -34,23 +43,53 @@ class FaceService:
     def model_loaded(self) -> bool:
         return self._app is not None
 
+    def _try_load_with_provider(self, provider: str) -> bool:
+        if provider == "CPUExecutionProvider":
+            providers = ["CPUExecutionProvider"]
+            ctx_id = -1
+        else:
+            providers = [provider, "CPUExecutionProvider"]
+            ctx_id = 0
+
+        try:
+            app = FaceAnalysis(
+                name=settings.face_model_name,
+                providers=providers,
+                allowed_modules=["detection", "recognition"],
+            )
+            det = settings.face_det_size
+            app.prepare(
+                ctx_id=ctx_id,
+                det_size=(det, det),
+                det_thresh=settings.face_det_thresh,
+            )
+            active = app.models["detection"].session.get_providers()[0]
+            if active != provider:
+                return False
+            self._app = app
+            self.provider = provider
+            return True
+        except Exception:
+            return False
+
     def load_model(self) -> None:
         if self._app is not None:
             return
 
-        available = ort.get_available_providers()
-        providers: list[str] = []
-        if "CUDAExecutionProvider" in available:
-            providers.append("CUDAExecutionProvider")
-            self.gpu = True
-            self.provider = "CUDAExecutionProvider"
-        providers.append("CPUExecutionProvider")
-        if not self.gpu:
-            self.provider = "CPUExecutionProvider"
+        available = set(ort.get_available_providers())
+        for provider, accelerator in _PROVIDER_PRIORITY:
+            if provider not in available:
+                continue
+            if self._try_load_with_provider(provider):
+                self.accelerator = accelerator
+                self.gpu = True
+                return
 
-        ctx_id = 0 if self.gpu else -1
-        self._app = FaceAnalysis(name="buffalo_l", providers=providers)
-        self._app.prepare(ctx_id=ctx_id, det_size=(640, 640))
+        if not self._try_load_with_provider("CPUExecutionProvider"):
+            raise RuntimeError("Failed to load face recognition model on any execution provider")
+        self.accelerator = "cpu"
+        self.gpu = False
+        self.provider = "CPUExecutionProvider"
 
     def decode_image(self, data: bytes) -> np.ndarray:
         arr = np.frombuffer(data, dtype=np.uint8)
@@ -67,19 +106,28 @@ class FaceService:
         data = base64.b64decode(b64)
         return self.decode_image(data)
 
+    def _resize_for_inference(self, image: np.ndarray) -> tuple[np.ndarray, float]:
+        max_size = settings.face_max_image_size
+        h, w = image.shape[:2]
+        if max(h, w) <= max_size:
+            return image, 1.0
+        scale = max_size / max(h, w)
+        return cv2.resize(image, (int(w * scale), int(h * scale))), scale
+
     def detect_and_embed(self, image: np.ndarray) -> list[FaceResult]:
         if self._app is None:
             self.load_model()
 
         import time
 
+        image, scale = self._resize_for_inference(image)
         start = time.perf_counter()
         faces = self._app.get(image)
         self._last_inference_ms = (time.perf_counter() - start) * 1000
 
         results: list[FaceResult] = []
         for face in faces:
-            bbox = face.bbox.astype(float).tolist()
+            bbox = (face.bbox.astype(float) / scale).tolist()
             results.append(FaceResult(bbox=bbox, embedding=face.normed_embedding.copy()))
         return results
 

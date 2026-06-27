@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FaceMatch } from "../api/client";
 
 interface CameraViewProps {
-  onFrame?: (dataUrl: string) => void;
+  onFrame?: (jpeg: ArrayBuffer) => void;
   faces?: FaceMatch[];
   fps?: number;
+  captureMaxWidth?: number;
+  captureQuality?: number;
   showOverlay?: boolean;
   mirrored?: boolean;
 }
@@ -13,12 +15,15 @@ export function CameraView({
   onFrame,
   faces = [],
   fps = 12,
+  captureMaxWidth = 640,
+  captureQuality = 0.65,
   showOverlay = true,
   mirrored = true,
 }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const captureRef = useRef<HTMLCanvasElement>(null);
+  const captureSizeRef = useRef({ width: 0, height: 0 });
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string>("");
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -66,12 +71,31 @@ export function CameraView({
       capture.height = video.videoHeight;
       const ctx = capture.getContext("2d");
       if (!ctx) return;
-      ctx.drawImage(video, 0, 0);
-      onFrame(capture.toDataURL("image/jpeg", 0.7));
+
+      let drawW = capture.width;
+      let drawH = capture.height;
+      if (captureMaxWidth > 0 && drawW > captureMaxWidth) {
+        const scale = captureMaxWidth / drawW;
+        drawW = captureMaxWidth;
+        drawH = Math.round(drawH * scale);
+        capture.width = drawW;
+        capture.height = drawH;
+      }
+
+      ctx.drawImage(video, 0, 0, drawW, drawH);
+      captureSizeRef.current = { width: drawW, height: drawH };
+      if (!onFrame) return;
+      capture.toBlob(
+        (blob) => {
+          if (blob) blob.arrayBuffer().then(onFrame);
+        },
+        "image/jpeg",
+        captureQuality,
+      );
     }, 1000 / fps);
 
     return () => clearInterval(interval);
-  }, [onFrame, fps]);
+  }, [onFrame, fps, captureMaxWidth, captureQuality]);
 
   useEffect(() => {
     if (!showOverlay) return;
@@ -87,8 +111,10 @@ export function CameraView({
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
-          const scaleX = canvas.width / video.videoWidth;
-          const scaleY = canvas.height / video.videoHeight;
+          const srcW = captureSizeRef.current.width || video.videoWidth;
+          const srcH = captureSizeRef.current.height || video.videoHeight;
+          const scaleX = canvas.width / srcW;
+          const scaleY = canvas.height / srcH;
 
           for (const face of faces) {
             const [x1, y1, x2, y2] = face.bbox;

@@ -48,6 +48,7 @@ class RecognizeResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     gpu: bool
+    accelerator: str  # gpu | igpu | cpu
     provider: str
     inference_ms: float | None
     model_loaded: bool

@@ -16,6 +16,7 @@ def health() -> HealthResponse:
         return HealthResponse(
             status=f"error: {exc}",
             gpu=False,
+            accelerator="cpu",
             provider="none",
             inference_ms=None,
             model_loaded=False,
@@ -33,6 +34,7 @@ def health() -> HealthResponse:
     return HealthResponse(
         status=status,
         gpu=face_service.gpu,
+        accelerator=face_service.accelerator,
         provider=face_service.provider,
         inference_ms=inference_ms,
         model_loaded=face_service.model_loaded,

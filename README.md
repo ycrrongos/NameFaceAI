@@ -1,33 +1,57 @@
 # NameFaceAI — 学生人脸记名系统
 
-帮助教师通过普通 USB/内置摄像头，在本地 NVIDIA GPU 电脑上实时识别人脸并显示学生姓名。
+帮助教师通过普通 USB/内置摄像头，在本地 GPU/CPU 电脑上实时识别人脸并显示学生姓名。
 
 ## 架构
 
 ```
-浏览器采集摄像头 → GPU 加速 InsightFace 推理 → SQLite 存储 → React 实时标注
-                                                      ↓
-                                            云端/本地 LLM 助手（非实时）
+浏览器采集摄像头 → InsightFace 推理（独显/集显/CPU 自动选择）→ SQLite 存储 → React 实时标注
+                                                              ↓
+                                                    云端/本地 LLM 助手（非实时）
 ```
 
 ## 环境要求
 
 | 组件 | 要求 |
 |------|------|
-| GPU | NVIDIA 显卡（推荐 ≥4GB VRAM），CUDA 11.8 或 12.x |
-| 驱动 | 最新 NVIDIA 驱动 |
-| Python | 3.11+ |
+| 独显 | NVIDIA 显卡（推荐 ≥4GB VRAM），CUDA 12.x / 13.x |
+| 集显 | Intel 核显（需安装 `onnxruntime-openvino`）或 Windows DirectML |
+| 无 GPU | 自动降级 CPU 推理（较慢但可用） |
+| Python | 3.11+（推荐，3.14 与部分依赖不兼容） |
 | Node.js | 18+ |
-| 摄像头 | USB 或内置，720p 即可 |
+| 摄像头 | USB 或内置，720p 以上（教室场景推荐 1080p） |
 
-### onnxruntime-gpu 与 CUDA 版本
+### 推理后端自动选择
 
-| onnxruntime-gpu | CUDA |
-|-----------------|------|
-| 1.19.x | 12.x |
-| 1.18.x | 12.x / 11.8 |
+启动时按以下顺序尝试，首个可用即采用：
 
-无 GPU 时系统自动降级 CPU 推理（较慢但可用）。
+1. **NVIDIA 独显** — `CUDAExecutionProvider`（需 `onnxruntime-gpu` + CUDA 驱动）
+2. **AMD 独显** — `ROCMExecutionProvider`
+3. **Intel 集显** — `OpenVINOExecutionProvider`（需 `pip install onnxruntime-openvino`）
+4. **Windows 集显/独显** — `DmlExecutionProvider`（Windows 自带）
+5. **CPU** — `CPUExecutionProvider`（兜底）
+
+### 依赖安装
+
+**有 NVIDIA 独显（推荐）：**
+
+```bash
+pip install -r requirements.txt          # 含 onnxruntime-gpu
+# Fedora/RHEL 还需 CUDA 运行时：sudo dnf install cuda-cudart cuda-cudnn cuda-libs libcublas
+```
+
+**纯 CPU / 无 NVIDIA 驱动：**
+
+```bash
+pip install -r requirements-cpu.txt      # 含 onnxruntime（CPU 版）
+```
+
+**Intel 集显加速（可选）：**
+
+```bash
+pip install -r requirements-cpu.txt
+pip install onnxruntime-openvino
+```
 
 ## 快速开始
 
@@ -104,6 +128,16 @@ OLLAMA_MODEL=qwen2.5:7b
 
 - 数据库：`data/nameface.db`
 - 人脸缩略图：`data/faces/{student_id}/`
+
+默认使用 `buffalo_l` 模型（SCRFD-10G 检测器，适合教室远距多人识别），可在 `backend/.env` 调整：
+
+```env
+FACE_MODEL_NAME=buffalo_l
+FACE_DET_SIZE=640
+FACE_DET_THRESH=0.4
+FACE_MAX_IMAGE_SIZE=1280
+FACE_MATCH_THRESHOLD=0.45
+```
 
 ## 识别阈值
 
