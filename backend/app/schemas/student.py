@@ -40,9 +40,18 @@ class FaceMatch(BaseModel):
     confidence: float
 
 
+class AttendanceCheckIn(BaseModel):
+    student_id: int
+    name: str
+    checked_in: bool
+    newly_marked: bool
+    source: str | None = None
+
+
 class RecognizeResponse(BaseModel):
     faces: list[FaceMatch]
     inference_ms: float
+    attendance: list[AttendanceCheckIn] = []
 
 
 class HealthResponse(BaseModel):

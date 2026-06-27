@@ -12,6 +12,7 @@ class NameTagOcrResponse(BaseModel):
     raw_text: str | None
     face_detected: bool
     face_bbox: list[float] | None = None
+    ocr_lines: list[str] = Field(default_factory=list)
 
 
 class NameTagEnrollRequest(BaseModel):

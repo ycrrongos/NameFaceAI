@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date, datetime
 
 from sqlalchemy.orm import Session
@@ -5,6 +6,13 @@ from sqlalchemy.orm import Session
 from app.models.attendance import Attendance
 from app.models.student import Student
 from app.schemas.attendance import AttendanceRow, AttendanceSheetResponse, AttendanceSummary
+
+
+@dataclass
+class CheckInResult:
+    checked_in: bool
+    newly_marked: bool
+    source: str | None = None
 
 
 class AttendanceService:
@@ -67,11 +75,13 @@ class AttendanceService:
         self,
         db: Session,
         student_id: int,
-        attendance_date: date,
+        attendance_date,
         status: str,
         source: str = "manual",
         notes: str | None = None,
     ) -> Attendance:
+        from datetime import datetime
+
         record = (
             db.query(Attendance)
             .filter(
@@ -116,23 +126,34 @@ class AttendanceService:
             count += 1
         return count
 
-    def try_auto_mark_present(self, db: Session, student_id: int) -> bool:
-        today = date.today()
-        record = (
+    def _today_record(self, db: Session, student_id: int) -> Attendance | None:
+        return (
             db.query(Attendance)
             .filter(
                 Attendance.student_id == student_id,
-                Attendance.attendance_date == today,
+                Attendance.attendance_date == date.today(),
             )
             .first()
         )
-        if record and record.source == "manual":
-            return False
-        if record and record.status == "present":
-            return False
 
-        self.upsert(db, student_id, today, "present", source="auto")
-        return True
+    def get_checkin_status(self, db: Session, student_id: int) -> CheckInResult:
+        record = self._today_record(db, student_id)
+        if record and record.status == "present":
+            return CheckInResult(checked_in=True, newly_marked=False, source=record.source)
+        return CheckInResult(checked_in=False, newly_marked=False, source=record.source if record else None)
+
+    def process_auto_checkin(self, db: Session, student_id: int) -> CheckInResult:
+        record = self._today_record(db, student_id)
+        if record and record.source == "manual" and record.status != "present":
+            return CheckInResult(checked_in=False, newly_marked=False, source="manual")
+        if record and record.status == "present":
+            return CheckInResult(checked_in=True, newly_marked=False, source=record.source)
+
+        self.upsert(db, student_id, date.today(), "present", source="auto")
+        return CheckInResult(checked_in=True, newly_marked=True, source="auto")
+
+    def try_auto_mark_present(self, db: Session, student_id: int) -> bool:
+        return self.process_auto_checkin(db, student_id).newly_marked
 
 
 attendance_service = AttendanceService()

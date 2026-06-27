@@ -8,10 +8,16 @@ import "./GlassesPage.css";
 export function GlassesPage() {
   const [fps, setFps] = useState(8);
   const [gpuMode, setGpuMode] = useState(false);
-  const { connected, faces, inferenceMs, error, sendFrame } = useRecognizeWebSocket(true);
+  const [punchFlash, setPunchFlash] = useState(false);
+  const { connected, faces, attendance, inferenceMs, error, sendFrame } = useRecognizeWebSocket(true);
 
   const primary = useMemo(() => pickPrimaryFace(faces), [faces]);
   const isKnown = primary != null && primary.name !== "未知";
+
+  const primaryCheckIn = useMemo(() => {
+    if (!primary?.student_id) return null;
+    return attendance.find((a) => a.student_id === primary.student_id) ?? null;
+  }, [attendance, primary?.student_id]);
 
   useEffect(() => {
     document.title = "NameFace · Rokid";
@@ -44,6 +50,13 @@ export function GlassesPage() {
     }
   }, [inferenceMs, gpuMode]);
 
+  useEffect(() => {
+    if (!primaryCheckIn?.newly_marked) return;
+    setPunchFlash(true);
+    const timer = window.setTimeout(() => setPunchFlash(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [primaryCheckIn?.newly_marked, primaryCheckIn?.student_id]);
+
   const backendHint = getBackendParam();
 
   return (
@@ -51,7 +64,7 @@ export function GlassesPage() {
       <div className="glasses-page__hud-top">
         <div className="glasses-page__status">
           <span className={`glasses-page__dot ${connected ? "glasses-page__dot--on" : "glasses-page__dot--warn"}`} />
-          {connected ? "识别中" : "连接中"}
+          {connected ? "识别 · 自动考勤" : "连接中"}
         </div>
         <div className="glasses-page__meta">
           {inferenceMs != null && `${inferenceMs.toFixed(0)}ms`}
@@ -80,14 +93,20 @@ export function GlassesPage() {
                 ? `置信度 ${(primary.confidence * 100).toFixed(0)}%`
                 : "未录入人脸"}
             </div>
+            {isKnown && primaryCheckIn?.checked_in && (
+              <div className={`glasses-page__checkin ${punchFlash ? "glasses-page__checkin--flash" : ""}`}>
+                ✓ 今日已打卡
+                {primaryCheckIn.newly_marked ? "（刚刚记录）" : primaryCheckIn.source === "auto" ? "（自动）" : ""}
+              </div>
+            )}
           </>
         ) : (
-          <div className="glasses-page__idle">注视学生面部</div>
+          <div className="glasses-page__idle">注视学生面部以识别并自动考勤</div>
         )}
       </div>
 
       <div className="glasses-page__hint">
-        Rokid · NameFaceAI
+        Rokid · NameFaceAI · 识别成功自动记录出勤
         {backendHint ? ` · ${backendHint}` : ""}
       </div>
     </div>

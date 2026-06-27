@@ -24,7 +24,7 @@ export function RecognizePage() {
   const [fps, setFps] = useState(10);
   const [gpuMode, setGpuMode] = useState(false);
   const [health, setHealth] = useState<string>("");
-  const { connected, faces, inferenceMs, error, sendFrame } = useRecognizeWebSocket(true);
+  const { connected, faces, attendance, inferenceMs, error, sendFrame } = useRecognizeWebSocket(true);
 
   useEffect(() => {
     api.health().then((h) => {
@@ -69,6 +69,9 @@ export function RecognizePage() {
             {faces.length > 0 && (
               <Chip label={`检测到 ${faces.length} 张人脸`} color="primary" variant="outlined" />
             )}
+            {attendance.filter((a) => a.newly_marked).map((a) => (
+              <Chip key={a.student_id} label={`${a.name} 已自动打卡`} color="success" />
+            ))}
           </Stack>
         </CardContent>
       </Card>

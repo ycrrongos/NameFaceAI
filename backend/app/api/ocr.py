@@ -18,6 +18,7 @@ def _to_ocr_response(result) -> NameTagOcrResponse:
         raw_text=result.raw_text,
         face_detected=result.face_detected,
         face_bbox=result.face_bbox,
+        ocr_lines=result.ocr_lines,
     )
 
 

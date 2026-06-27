@@ -79,10 +79,11 @@ export function EnrollPage() {
       const result = await api.detectNameTag(image);
       applyOcrResult(result);
       if (!result.name) {
+        const detected = result.ocr_lines.length > 0 ? result.ocr_lines.join(" / ") : result.raw_text;
         setError(
-          result.raw_text
-            ? `未能识别姓名，OCR 读到：${result.raw_text}`
-            : "未能从名牌识别出姓名，请调整角度或手动输入"
+          detected
+            ? `未能识别有效姓名（检测到：${detected}）。请让名牌文字清晰、充满画面后再试`
+            : "未能识别名牌文字。请将名牌对准镜头、保证光线充足，或手动输入姓名"
         );
       }
     } catch (e) {
@@ -214,8 +215,13 @@ export function EnrollPage() {
               <Typography variant="subtitle1">名牌识别（可选）</Typography>
             </Stack>
             <Typography variant="body2" color="text.secondary">
-              若照片中含姓名牌，可自动 OCR 识别姓名并填入下方表单。
+              拍摄仅含姓名的牌子时，请让文字清晰居中、占满画面；若同时拍到人脸，系统会优先扫描胸牌区域。
             </Typography>
+            {ocrResult && ocrResult.ocr_lines.length > 0 && !ocrResult.name && (
+              <Typography variant="caption" color="text.secondary">
+                OCR 检测到：{ocrResult.ocr_lines.join(" / ")}
+              </Typography>
+            )}
             {ocrResult?.name && (
               <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
                 <Chip

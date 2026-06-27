@@ -16,6 +16,12 @@ async def lifespan(app: FastAPI):
         face_service.load_model()
     except Exception:
         pass
+    try:
+        from app.services.ocr_service import ocr_service
+
+        ocr_service.load_model()
+    except Exception:
+        pass
     yield
 
 

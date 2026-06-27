@@ -173,6 +173,25 @@
   color: #888;
 }
 
+.glasses-page__checkin {
+  margin-top: 12px;
+  display: inline-block;
+  padding: 8px 20px;
+  border-radius: 999px;
+  border: 2px solid #39ff14;
+  color: #39ff14;
+  font-size: clamp(1rem, 4vw, 1.35rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: rgba(57, 255, 20, 0.12);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.glasses-page__checkin--flash {
+  transform: scale(1.05);
+  box-shadow: 0 0 24px rgba(57, 255, 20, 0.55);
+}
+
 .glasses-page__hint {
   position: absolute;
   bottom: 8px;

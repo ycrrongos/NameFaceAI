@@ -16,9 +16,18 @@ export interface FaceMatch {
   confidence: number;
 }
 
+export interface AttendanceCheckIn {
+  student_id: number;
+  name: string;
+  checked_in: boolean;
+  newly_marked: boolean;
+  source: string | null;
+}
+
 export interface RecognizeResult {
   faces: FaceMatch[];
   inference_ms: number;
+  attendance?: AttendanceCheckIn[];
 }
 
 export interface HealthInfo {
@@ -38,6 +47,7 @@ export interface NameTagOcrResult {
   raw_text: string | null;
   face_detected: boolean;
   face_bbox: number[] | null;
+  ocr_lines: string[];
 }
 
 export type AttendanceStatus = "present" | "absent" | "late" | "excused";
@@ -82,7 +92,17 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   if (!resp.ok) {
     const text = await resp.text();
-    throw new Error(text || resp.statusText);
+    let message = text || resp.statusText;
+    try {
+      const json = JSON.parse(text) as { detail?: string | { msg?: string }[] };
+      if (typeof json.detail === "string") message = json.detail;
+      else if (Array.isArray(json.detail)) {
+        message = json.detail.map((d) => d.msg ?? String(d)).join("；");
+      }
+    } catch {
+      /* keep raw text */
+    }
+    throw new Error(message);
   }
   if (resp.status === 204) return undefined as T;
   return resp.json();

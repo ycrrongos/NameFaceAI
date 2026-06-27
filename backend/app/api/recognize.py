@@ -4,23 +4,58 @@ import time
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.database import SessionLocal
-from app.schemas.student import FaceMatch, RecognizeResponse
+from app.schemas.student import AttendanceCheckIn, FaceMatch, RecognizeResponse
 from app.services.attendance_service import attendance_service
 from app.services.face_service import face_service
 
 router = APIRouter(tags=["recognize"])
 
-_AUTO_MARK_DEBOUNCE_SEC = 60.0
+_AUTO_MARK_DEBOUNCE_SEC = 30.0
 _last_auto_mark: dict[int, float] = {}
 
 
-def _maybe_auto_mark_attendance(db, student_id: int) -> None:
+def _handle_checkin(db, student_id: int, name: str) -> AttendanceCheckIn:
     now = time.monotonic()
     last = _last_auto_mark.get(student_id, 0.0)
-    if now - last < _AUTO_MARK_DEBOUNCE_SEC:
-        return
-    if attendance_service.try_auto_mark_present(db, student_id):
-        _last_auto_mark[student_id] = now
+    if now - last >= _AUTO_MARK_DEBOUNCE_SEC:
+        result = attendance_service.process_auto_checkin(db, student_id)
+        if result.newly_marked:
+            _last_auto_mark[student_id] = now
+    else:
+        result = attendance_service.get_checkin_status(db, student_id)
+
+    return AttendanceCheckIn(
+        student_id=student_id,
+        name=name,
+        checked_in=result.checked_in,
+        newly_marked=result.newly_marked,
+        source=result.source,
+    )
+
+
+def _build_response(db, matches, inference_ms: float) -> RecognizeResponse:
+    attendance: list[AttendanceCheckIn] = []
+    seen: set[int] = set()
+
+    for match in matches:
+        if match.student_id is None or match.student_id in seen:
+            continue
+        seen.add(match.student_id)
+        attendance.append(_handle_checkin(db, match.student_id, match.name))
+
+    return RecognizeResponse(
+        faces=[
+            FaceMatch(
+                bbox=m.bbox,
+                name=m.name,
+                student_id=m.student_id,
+                confidence=m.confidence,
+            )
+            for m in matches
+        ],
+        inference_ms=inference_ms,
+        attendance=attendance,
+    )
 
 
 @router.websocket("/ws/recognize")
@@ -44,21 +79,7 @@ async def recognize_ws(websocket: WebSocket) -> None:
                 if frame_b64:
                     image = face_service.decode_base64_image(frame_b64)
                     matches, inference_ms = face_service.recognize(db, image)
-                    for match in matches:
-                        if match.student_id is not None:
-                            _maybe_auto_mark_attendance(db, match.student_id)
-                    response = RecognizeResponse(
-                        faces=[
-                            FaceMatch(
-                                bbox=m.bbox,
-                                name=m.name,
-                                student_id=m.student_id,
-                                confidence=m.confidence,
-                            )
-                            for m in matches
-                        ],
-                        inference_ms=inference_ms,
-                    )
+                    response = _build_response(db, matches, inference_ms)
                     await websocket.send_json(response.model_dump())
                 continue
 
@@ -68,21 +89,7 @@ async def recognize_ws(websocket: WebSocket) -> None:
             try:
                 image = face_service.decode_image(frame)
                 matches, inference_ms = face_service.recognize(db, image)
-                for match in matches:
-                    if match.student_id is not None:
-                        _maybe_auto_mark_attendance(db, match.student_id)
-                response = RecognizeResponse(
-                    faces=[
-                        FaceMatch(
-                            bbox=m.bbox,
-                            name=m.name,
-                            student_id=m.student_id,
-                            confidence=m.confidence,
-                        )
-                        for m in matches
-                    ],
-                    inference_ms=inference_ms,
-                )
+                response = _build_response(db, matches, inference_ms)
                 await websocket.send_json(response.model_dump())
             except Exception as exc:
                 await websocket.send_json({"error": str(exc)})
