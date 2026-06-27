@@ -23,3 +23,11 @@ frontend/dist/
 
 # InsightFace cache (downloaded at runtime)
 .insightface/
+
+# Android
+rokid-android/.gradle/
+rokid-android/app/build/
+rokid-android/build/
+rokid-android/local.properties
+rokid-android/.idea/
+rokid-android/*.iml

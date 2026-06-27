@@ -9,6 +9,31 @@
   -webkit-user-select: none;
 }
 
+/* Rokid：不做 CSS 旋转（系统会统一旋转 WebView 与透视层；再 rotate 会导致框偏 90°） */
+.glasses-page--rokid {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+html.rokid-webview,
+html.rokid-webview body,
+body.glasses-body {
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+html.rokid-webview .glasses-camera__start {
+  background: #000;
+}
+
+html.rokid-webview .glasses-page__error-bar {
+  background: #000;
+  border-color: #39ff14;
+  color: #39ff14;
+}
+
 .glasses-page__hud-top {
   position: absolute;
   top: 0;
@@ -65,6 +90,25 @@
   object-fit: cover;
   transform: scaleX(-1);
   opacity: 0.35;
+}
+
+/* 隐藏预览，摄像头仍在后台采集 */
+.glasses-camera__video--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  transform: none;
+}
+
+.glasses-camera--boxes-only {
+  background: #000;
+}
+
+.glasses-camera--boxes-only .glasses-camera__overlay {
+  background: transparent;
 }
 
 .glasses-camera__overlay {

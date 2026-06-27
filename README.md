@@ -83,7 +83,16 @@ chmod +x scripts/dev.sh
 ./scripts/dev.sh
 ```
 
-浏览器打开 **http://localhost:5173**
+浏览器打开 **https://localhost:5173**（HTTP 亦可：`http://localhost:5173`）
+
+### 4. Rokid 眼镜 Android 套壳
+
+```bash
+./scripts/build-rokid-apk.sh
+adb install -r rokid-android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+详见 [rokid-android/README.md](rokid-android/README.md)。套壳 App 全屏加载 `/rokid` 页面，可在设置中填写电脑 IP。
 
 ## 使用流程
 
