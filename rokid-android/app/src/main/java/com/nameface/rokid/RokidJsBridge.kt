@@ -17,6 +17,22 @@ class RokidJsBridge(private val webView: WebView) {
         webView.post { onPageReady?.invoke() }
     }
 
+    @JavascriptInterface
+    fun setEnrollMode(enabled: Boolean) {
+        webView.post {
+            RecognizeStreamService.setStreamingEnabled(!enabled)
+            if (enabled && !RecognizeStreamService.isRunning()) {
+                val ctx = webView.context
+                RecognizeStreamService.start(ctx, Prefs.getBackendHost(ctx))
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun captureEnrollmentPhoto(): String {
+        return RecognizeStreamService.captureEnrollmentPhoto().orEmpty()
+    }
+
     fun pushRecognizeResult(json: JSONObject) {
         val b64 = Base64.encodeToString(json.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
         // atob() alone corrupts UTF-8; decode bytes with TextDecoder before JSON.parse

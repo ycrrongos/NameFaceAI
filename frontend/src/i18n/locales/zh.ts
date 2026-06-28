@@ -185,6 +185,17 @@ export const zh = {
     cameraStarting: "开启中…",
     cameraStart: "开启摄像头",
   },
+  glassesEnroll: {
+    entry: "名牌录入",
+    nameTagHint: "对准胸牌或姓名牌，确保文字清晰居中；可同时拍到人脸以提高录入质量",
+    captureEnroll: "拍照录入",
+    back: "返回",
+    cameraNotReady: "摄像头尚未就绪，请稍后再试",
+    success: "已录入 {{name}}",
+    sessionCount: "本次已录入 {{count}} 人",
+    aimNameTag: "对准名牌后拍照",
+    readyNext: "可继续录入下一位",
+  },
   camera: {
     httpsWarning: "通过 IP 访问需使用 HTTPS：",
     phoneStreamInfo: "手机 USB 摄像头（运行 ./scripts/phone-mjpeg-bridge.sh）",

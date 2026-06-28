@@ -37,6 +37,10 @@ class NativeCameraCapture(
     private var encoding = false
     private var frameWidth = 0
     private var frameHeight = 0
+    @Volatile
+    private var lastJpeg: ByteArray? = null
+
+    fun getLatestJpeg(): ByteArray? = lastJpeg
 
     fun start() {
         if (running) return
@@ -183,6 +187,7 @@ class NativeCameraCapture(
         } else {
             MediaCodecJpegEncoder.encodeYuv420(image, jpegQuality)
         } ?: return
+        lastJpeg = jpeg
         onJpeg(jpeg, frameWidth, frameHeight)
     }
 

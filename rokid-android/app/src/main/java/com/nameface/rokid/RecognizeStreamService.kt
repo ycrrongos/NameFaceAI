@@ -134,6 +134,12 @@ class RecognizeStreamService : Service() {
 
         fun isRunning(): Boolean = running && instance?.session != null
 
+        fun setStreamingEnabled(enabled: Boolean) {
+            instance?.session?.streamingEnabled = enabled
+        }
+
+        fun captureEnrollmentPhoto(): String? = instance?.session?.captureLatestPhoto()
+
         fun start(context: Context, backendHost: String) {
             val intent = Intent(context, RecognizeStreamService::class.java)
                 .putExtra(EXTRA_BACKEND_HOST, backendHost)

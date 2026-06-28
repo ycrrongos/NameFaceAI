@@ -1,0 +1,148 @@
+.glasses-enroll {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  color: #39ff14;
+  font-family: "Noto Sans SC", "Droid Sans Fallback", "sans-serif";
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+.glasses-enroll__camera {
+  position: absolute;
+  inset: 0;
+}
+
+.glasses-enroll__camera .glasses-camera__video--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.glasses-enroll__hud {
+  position: relative;
+  z-index: 10;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px 120px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.85));
+}
+
+.glasses-enroll__reticle {
+  width: 42px;
+  height: 42px;
+  border: 2px solid rgba(57, 255, 20, 0.75);
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(57, 255, 20, 0.45);
+  margin-bottom: 20px;
+}
+
+.glasses-enroll__hint {
+  font-size: clamp(1rem, 4.5vw, 1.25rem);
+  opacity: 0.75;
+  text-align: center;
+  line-height: 1.5;
+  max-width: 92vw;
+}
+
+.glasses-enroll__session {
+  margin-top: 12px;
+  font-size: 1rem;
+  opacity: 0.7;
+  text-align: center;
+}
+
+.glasses-enroll__flash-name {
+  margin-top: 16px;
+  font-size: clamp(2.5rem, 12vw, 4rem);
+  font-weight: 700;
+  line-height: 1.1;
+  color: #39ff14;
+  text-shadow: 0 0 24px rgba(57, 255, 20, 0.75);
+  text-align: center;
+  max-width: 92vw;
+}
+
+.glasses-enroll__flash-name--idle {
+  font-size: clamp(1.25rem, 5vw, 1.75rem);
+  font-weight: 600;
+  opacity: 0.55;
+  text-shadow: none;
+}
+
+.glasses-enroll__recent {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  max-width: 92vw;
+}
+
+.glasses-enroll__recent-chip {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(57, 255, 20, 0.35);
+  background: rgba(57, 255, 20, 0.08);
+  font-size: 0.95rem;
+  opacity: 0.85;
+}
+
+.glasses-enroll__actions--two {
+  grid-template-columns: 1fr 2fr;
+}
+
+.glasses-enroll__error {
+  position: relative;
+  z-index: 12;
+  margin: 0 16px 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #ff4444;
+  background: rgba(255, 68, 68, 0.15);
+  color: #ffaaaa;
+  font-size: 14px;
+  text-align: center;
+}
+
+.glasses-enroll__actions {
+  position: relative;
+  z-index: 12;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
+  padding: 12px 16px 20px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 0.7));
+}
+
+.glasses-enroll__btn {
+  border: none;
+  border-radius: 14px;
+  padding: 14px 8px;
+  font-size: clamp(0.95rem, 4vw, 1.1rem);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.glasses-enroll__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.glasses-enroll__btn--ghost {
+  background: rgba(57, 255, 20, 0.12);
+  color: #a8ffb0;
+  border: 2px solid rgba(57, 255, 20, 0.35);
+}
+
+.glasses-enroll__btn--primary {
+  background: #39ff14;
+  color: #000;
+}

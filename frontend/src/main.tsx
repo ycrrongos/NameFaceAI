@@ -14,6 +14,7 @@ import { AppLayout } from "./layout/AppLayout.tsx";
 import { AssistantPage } from "./pages/AssistantPage.tsx";
 import { AttendancePage } from "./pages/AttendancePage.tsx";
 import { EnrollPage } from "./pages/EnrollPage.tsx";
+import { GlassesEnrollPage } from "./pages/GlassesEnrollPage.tsx";
 import { GlassesPage } from "./pages/GlassesPage.tsx";
 import { PracticePage } from "./pages/PracticePage.tsx";
 import { RecognizePage } from "./pages/RecognizePage.tsx";
@@ -30,7 +31,9 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/rokid" element={<GlassesPage />} />
+          <Route path="/rokid/enroll" element={<GlassesEnrollPage />} />
           <Route path="/glasses" element={<GlassesPage />} />
+          <Route path="/glasses/enroll" element={<GlassesEnrollPage />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<RecognizePage />} />
             <Route path="/recognize" element={<RecognizePage />} />

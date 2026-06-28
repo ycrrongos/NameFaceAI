@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "@fontsource/noto-sans-sc/chinese-simplified-400.css";
 import "@fontsource/noto-sans-sc/chinese-simplified-700.css";
 import { api } from "../api/client";
@@ -12,10 +13,11 @@ import "./GlassesPage.css";
 
 export function GlassesPage() {
   const { t, faceName } = useI18n();
+  const navigate = useNavigate();
   const rokid = isRokidWebView();
   const nativeCamera = isRokidNativeCamera();
-  const showCenterHud = rokid;
-  const showBrowserPanel = !rokid && !nativeCamera;
+  const showCenterHud = rokid || nativeCamera;
+  const showBrowserPanel = !showCenterHud;
   const [fps, setFps] = useState(8);
   const [gpuMode, setGpuMode] = useState(false);
   const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
@@ -94,6 +96,11 @@ export function GlassesPage() {
 
   const backendHint = getBackendParam();
 
+  const openEnroll = () => {
+    const base = window.location.pathname.startsWith("/glasses") ? "/glasses/enroll" : "/rokid/enroll";
+    navigate(`${base}${window.location.search}`);
+  };
+
   return (
     <div className={`glasses-page${rokid ? " glasses-page--rokid" : ""}`}>
       {showBrowserPanel && (
@@ -110,7 +117,11 @@ export function GlassesPage() {
         </div>
       )}
 
-      {error && showBrowserPanel && <div className="glasses-page__error-bar">{error}</div>}
+      {error && (showBrowserPanel || showCenterHud) && (
+        <div className={`glasses-page__error-bar${showCenterHud ? " glasses-page__error-bar--hud" : ""}`}>
+          {error}
+        </div>
+      )}
 
       <GlassesCamera
         faces={faces}
@@ -134,8 +145,13 @@ export function GlassesPage() {
               <div className={`glasses-page__center-name ${isKnown ? "" : "glasses-page__center-name--unknown"}`}>
                 {isKnown ? primary.name : faceName("未知")}
               </div>
-            ) : null}
+            ) : (
+              <div className="glasses-page__center-idle">{t("glasses.idleHint")}</div>
+            )}
           </div>
+          <button type="button" className="glasses-page__enroll-fab" onClick={openEnroll}>
+            {t("glassesEnroll.entry")}
+          </button>
         </div>
       )}
 

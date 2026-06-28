@@ -189,6 +189,17 @@ export const en: TranslationDict = {
     cameraStarting: "Starting…",
     cameraStart: "Start camera",
   },
+  glassesEnroll: {
+    entry: "Name tag",
+    nameTagHint: "Center the name tag in view; include the face when possible for better enrollment",
+    captureEnroll: "Capture & enroll",
+    back: "Back",
+    cameraNotReady: "Camera not ready. Try again in a moment.",
+    success: "Enrolled {{name}}",
+    sessionCount: "{{count}} enrolled this session",
+    aimNameTag: "Aim at name tag, then capture",
+    readyNext: "Ready for next student",
+  },
   camera: {
     httpsWarning: "Use HTTPS when accessing via IP:",
     phoneStreamInfo: "Phone USB camera (run ./scripts/phone-mjpeg-bridge.sh)",
