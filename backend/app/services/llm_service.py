@@ -11,6 +11,29 @@ class LLMProvider(Protocol):
     async def chat(self, messages: list[dict[str, str]]) -> str: ...
 
 
+class OpenAIProvider:
+    async def chat(self, messages: list[dict[str, str]]) -> str:
+        if not settings.openai_api_key:
+            raise RuntimeError("OPENAI_API_KEY 未配置")
+
+        payload = {
+            "model": settings.openai_model,
+            "messages": messages,
+        }
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                f"{settings.openai_base_url.rstrip('/')}/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.openai_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"]
+
+
 class DashScopeProvider:
     async def chat(self, messages: list[dict[str, str]]) -> str:
         if not settings.dashscope_api_key:
@@ -94,6 +117,8 @@ def build_student_context(db: Session) -> str:
 
 def get_llm_provider() -> LLMProvider | None:
     provider = settings.llm_provider.lower().strip()
+    if provider == "openai":
+        return OpenAIProvider()
     if provider == "dashscope":
         return DashScopeProvider()
     if provider == "deepseek":
@@ -108,7 +133,7 @@ class LLMService:
         provider = get_llm_provider()
         if provider is None:
             raise RuntimeError(
-                "LLM 未配置。请在 .env 中设置 LLM_PROVIDER=dashscope|deepseek|ollama"
+                "LLM 未配置。请在 .env 中设置 LLM_PROVIDER=openai|dashscope|deepseek|ollama"
             )
 
         context = build_student_context(db)

@@ -22,6 +22,6 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
-    from app.models import attendance, student  # noqa: F401
+    from app.models import attendance, practice, student  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

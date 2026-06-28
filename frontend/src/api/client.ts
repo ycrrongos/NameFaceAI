@@ -75,6 +75,57 @@ export interface AttendanceSummary {
   unmarked: number;
 }
 
+export interface PracticeProgress {
+  round: number;
+  round_answered: number;
+  round_total: number;
+  mastered: number;
+  remaining: number;
+  session_total: number;
+}
+
+export interface PracticeQuestion {
+  session_id: number;
+  target_student_id: number;
+  photo_base64: string | null;
+  options: string[];
+  round: number;
+  progress: PracticeProgress;
+  adaptation_hint: string | null;
+}
+
+export interface PracticeAnswerResponse {
+  correct: boolean;
+  correct_name: string;
+  chosen_name: string;
+  round_complete: boolean;
+  session_complete: boolean;
+  progress: PracticeProgress;
+  feedback: string | null;
+}
+
+export interface PracticeAttemptRecord {
+  id: number;
+  round_number: number;
+  target_student_id: number;
+  target_name: string;
+  chosen_name: string;
+  correct_name: string;
+  is_correct: boolean;
+  created_at: string;
+}
+
+export interface PracticeSessionSummary {
+  id: number;
+  class_name: string | null;
+  status: string;
+  round_number: number;
+  mastered: number;
+  total_students: number;
+  wrong_count: number;
+  attempts: PracticeAttemptRecord[];
+}
+
 export interface AttendanceSheet {
   date: string;
   rows: AttendanceRow[];
@@ -183,6 +234,23 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ messages }),
     }),
+  startPracticeSession: (data: { class_name?: string }) =>
+    request<{ session_id: number; round: number }>("/api/practice/sessions", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getPracticeQuestion: (sessionId: number) =>
+    request<PracticeQuestion>(`/api/practice/sessions/${sessionId}/question`),
+  submitPracticeAnswer: (
+    sessionId: number,
+    data: { target_student_id: number; chosen_name: string }
+  ) =>
+    request<PracticeAnswerResponse>(`/api/practice/sessions/${sessionId}/answer`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getPracticeSummary: (sessionId: number) =>
+    request<PracticeSessionSummary>(`/api/practice/sessions/${sessionId}/summary`),
 };
 
 /** @deprecated use wsRecognizeUrl() */

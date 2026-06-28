@@ -91,6 +91,7 @@ export const navItems = [
   { path: "/enroll", label: "录入学生", icon: "person_add" as const },
   { path: "/students", label: "学生管理", icon: "groups" as const },
   { path: "/attendance", label: "考勤表", icon: "attendance" as const },
+  { path: "/practice", label: "记名练习", icon: "quiz" as const },
   { path: "/assistant", label: "AI 助手", icon: "smart_toy" as const },
   { path: "/rokid-preview", label: "Rokid 预览", icon: "monitor" as const },
   { path: "/rokid", label: "Rokid 眼镜", icon: "rokid" as const },

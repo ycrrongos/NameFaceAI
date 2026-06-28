@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import "@fontsource/noto-sans-sc/chinese-simplified-400.css";
+import "@fontsource/noto-sans-sc/chinese-simplified-700.css";
 import { api } from "../api/client";
 import { GlassesCamera, pickCenterFace } from "../components/GlassesCamera";
 import { getBackendParam, isRokidNativeCamera, isRokidWebView } from "../config/runtime";
@@ -9,6 +11,8 @@ import "./GlassesPage.css";
 export function GlassesPage() {
   const rokid = isRokidWebView();
   const nativeCamera = isRokidNativeCamera();
+  const showCenterHud = rokid;
+  const showBrowserPanel = !rokid && !nativeCamera;
   const [fps, setFps] = useState(8);
   const [gpuMode, setGpuMode] = useState(false);
   const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
@@ -86,7 +90,7 @@ export function GlassesPage() {
 
   return (
     <div className={`glasses-page${rokid ? " glasses-page--rokid" : ""}`}>
-      {!nativeCamera && (
+      {showBrowserPanel && (
         <div className="glasses-page__hud-top">
           <div className="glasses-page__status">
             <span className={`glasses-page__dot ${connected ? "glasses-page__dot--on" : "glasses-page__dot--warn"}`} />
@@ -99,7 +103,7 @@ export function GlassesPage() {
         </div>
       )}
 
-      {error && <div className="glasses-page__error-bar">{error}</div>}
+      {error && showBrowserPanel && <div className="glasses-page__error-bar">{error}</div>}
 
       <GlassesCamera
         faces={faces}
@@ -109,12 +113,26 @@ export function GlassesPage() {
         fps={fps}
         captureMaxWidth={nativeCamera ? 960 : 640}
         captureQuality={nativeCamera ? 0.55 : 0.6}
-        hideVideo={nativeCamera}
-        autoStart={!nativeCamera}
+        hideVideo={nativeCamera || rokid}
+        hideOverlay={rokid}
+        autoStart={!nativeCamera && showBrowserPanel}
         nativeCapture={nativeCamera}
       />
 
-      {!nativeCamera && (
+      {showCenterHud && (
+        <div className="glasses-page__center-hud" aria-live="polite">
+          <div className="glasses-page__reticle-wrap">
+            <div className="glasses-page__reticle" aria-hidden="true" />
+            {primary ? (
+              <div className={`glasses-page__center-name ${isKnown ? "" : "glasses-page__center-name--unknown"}`}>
+                {isKnown ? primary.name : "未知"}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {showBrowserPanel && (
         <>
           <div className="glasses-page__name-panel">
             {primary ? (

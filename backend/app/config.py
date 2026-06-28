@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     tcp_recognize_port: int = 8001
 
     llm_provider: str = ""
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+    openai_base_url: str = "https://api.openai.com"
     dashscope_api_key: str = ""
     dashscope_model: str = "qwen-plus"
     deepseek_api_key: str = ""
