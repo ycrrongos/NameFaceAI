@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 _MAX_FRAME_BYTES = 10 * 1024 * 1024
 _HEADER = struct.Struct(">I")
+_TCP_PROBE_MAGIC = b"NFP\x01"
 
 
 async def _read_exact(reader: asyncio.StreamReader, size: int) -> bytes:
@@ -24,15 +25,33 @@ async def _read_exact(reader: asyncio.StreamReader, size: int) -> bytes:
     return data
 
 
+async def _send_discovery_payload(writer: asyncio.StreamWriter) -> None:
+    payload = json.dumps(
+        {
+            "service_id": settings.service_id,
+            "service_name": "NameFaceAI",
+            "role": "tcp_recognize",
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+    writer.write(_HEADER.pack(len(payload)))
+    writer.write(payload)
+    await writer.drain()
+
+
 async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
     peer = writer.get_extra_info("peername")
     logger.info("TCP recognize connected: %s", peer)
     db = new_db_session()
     try:
+        first_bytes = await _read_exact(reader, _HEADER.size)
+        if first_bytes == _TCP_PROBE_MAGIC:
+            await _send_discovery_payload(writer)
+            return
+
         face_service.load_model()
         while True:
-            length_bytes = await _read_exact(reader, _HEADER.size)
-            (length,) = _HEADER.unpack(length_bytes)
+            (length,) = _HEADER.unpack(first_bytes)
             if length < 1 or length > _MAX_FRAME_BYTES:
                 raise ValueError(f"invalid frame length: {length}")
             frame = await _read_exact(reader, length)
@@ -46,6 +65,7 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
             writer.write(_HEADER.pack(len(payload)))
             writer.write(payload)
             await writer.drain()
+            first_bytes = await _read_exact(reader, _HEADER.size)
     except (asyncio.IncompleteReadError, ConnectionError, ConnectionResetError):
         pass
     except Exception:

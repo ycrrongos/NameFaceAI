@@ -45,6 +45,11 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun runDiscovery() {
+        if (!NetworkHelper.isWifiConnected(this)) {
+            Toast.makeText(this, R.string.discover_no_network, Toast.LENGTH_LONG).show()
+            NetworkHelper.openWifiSettings(this)
+            return
+        }
         discovering = true
         setDiscoveryUi(true)
         ServerDiscovery.discover { result ->

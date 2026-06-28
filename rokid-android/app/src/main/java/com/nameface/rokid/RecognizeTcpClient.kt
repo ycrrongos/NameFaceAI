@@ -26,6 +26,8 @@ class RecognizeTcpClient(
     private var writerThread: Thread? = null
     private val latestFrame = AtomicReference<ByteArray?>(null)
     private val frameHeader = ByteBuffer.allocate(4)
+    private val minSendIntervalMs = 1000L / Prefs.MAX_STREAM_FPS
+    private var lastSentAtMs = 0L
 
     fun start() {
         if (running) return
@@ -113,11 +115,17 @@ class RecognizeTcpClient(
                 continue
             }
             try {
+                val now = System.currentTimeMillis()
+                val wait = minSendIntervalMs - (now - lastSentAtMs)
+                if (wait > 0) {
+                    Thread.sleep(wait)
+                }
                 frameHeader.clear()
                 frameHeader.putInt(frame.size)
                 out.write(frameHeader.array())
                 out.write(frame)
                 out.flush()
+                lastSentAtMs = System.currentTimeMillis()
             } catch (e: Exception) {
                 if (running) Log.w(tag, "write failed", e)
                 break

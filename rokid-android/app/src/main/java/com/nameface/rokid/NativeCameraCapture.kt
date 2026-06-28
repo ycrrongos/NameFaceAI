@@ -23,6 +23,7 @@ class NativeCameraCapture(
     private val context: Context,
     private val maxWidth: Int = 480,
     private val jpegQuality: Int = 50,
+    private val maxFps: Int = Prefs.MAX_STREAM_FPS,
     private val onJpeg: (ByteArray, Int, Int) -> Unit,
     private val onError: (String) -> Unit,
 ) {
@@ -39,6 +40,9 @@ class NativeCameraCapture(
     private var frameHeight = 0
     @Volatile
     private var lastJpeg: ByteArray? = null
+    private val minFrameIntervalNs: Long =
+        1_000_000_000L / maxFps.coerceIn(1, 60)
+    private var lastDeliveredAtNs = 0L
 
     fun getLatestJpeg(): ByteArray? = lastJpeg
 
@@ -111,11 +115,21 @@ class NativeCameraCapture(
 
             imageReader = ImageReader.newInstance(size.width, size.height, format, 3).apply {
                 setOnImageAvailableListener({ reader ->
-                    if (!running || encoding) {
-                        reader.acquireLatestImage()?.close()
+                    val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
+                    if (!running) {
+                        image.close()
                         return@setOnImageAvailableListener
                     }
-                    val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
+                    if (encoding) {
+                        image.close()
+                        return@setOnImageAvailableListener
+                    }
+                    val now = System.nanoTime()
+                    if (now - lastDeliveredAtNs < minFrameIntervalNs) {
+                        image.close()
+                        return@setOnImageAvailableListener
+                    }
+                    lastDeliveredAtNs = now
                     encoding = true
                     try {
                         deliverFrame(image)

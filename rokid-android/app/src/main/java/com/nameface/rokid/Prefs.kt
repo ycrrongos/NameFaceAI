@@ -14,6 +14,8 @@ object Prefs {
     private const val DEFAULT_FRONTEND = "192.168.1.10:5173"
     private const val DEFAULT_BACKEND = "192.168.1.10:8000"
     const val DEFAULT_TCP_RECOGNIZE_PORT = 8001
+    /** 推流上限，降低眼镜发热与网络负载 */
+    const val MAX_STREAM_FPS = 24
 
     fun getFrontendHost(context: Context): String {
         return prefs(context).getString(KEY_FRONTEND, DEFAULT_FRONTEND) ?: DEFAULT_FRONTEND

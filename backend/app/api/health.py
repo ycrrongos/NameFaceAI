@@ -34,6 +34,7 @@ def health() -> HealthResponse:
     except Exception as exc:
         return HealthResponse(
             status=f"error: {exc}",
+            service_id=settings.service_id,
             gpu=False,
             accelerator="cpu",
             accelerator_label="CPU",
@@ -57,6 +58,7 @@ def health() -> HealthResponse:
 
     return HealthResponse(
         status=status,
+        service_id=settings.service_id,
         gpu=face_service.gpu,
         accelerator=face_service.accelerator,
         accelerator_label=label,

@@ -4,7 +4,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import attendance, health, llm, ocr, practice, preview, recognize, students
+from app.api import attendance, discovery, health, llm, ocr, practice, preview, recognize, students
 from app.config import settings
 from app.database import init_db
 from app.services.face_service import face_service
@@ -51,6 +51,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api")
+app.include_router(discovery.router, prefix="/api")
 app.include_router(students.router, prefix="/api")
 app.include_router(attendance.router, prefix="/api")
 app.include_router(ocr.router, prefix="/api")

@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.http.SslError
 import android.os.Bundle
+import android.provider.Settings
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
@@ -32,6 +33,8 @@ class MainActivity : AppCompatActivity() {
     private var pendingPermissionRequest: PermissionRequest? = null
     private var jsBridge: RokidJsBridge? = null
     private var serverReady = false
+    private var waitingForWifi = false
+    private var lastWifiSettingsLaunchMs = 0L
 
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -39,7 +42,7 @@ class MainActivity : AppCompatActivity() {
             pendingPermissionRequest = null
             when {
                 granted && request != null -> runOnUiThread { request.grant(request.resources) }
-                granted -> startWithDiscovery()
+                granted -> beginAppFlow()
                 request != null -> runOnUiThread { request.deny() }
                 else -> Toast.makeText(this, R.string.camera_permission_denied, Toast.LENGTH_LONG).show()
             }
@@ -47,7 +50,7 @@ class MainActivity : AppCompatActivity() {
 
     private val settingsLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            startWithDiscovery()
+            beginAppFlow()
         }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -66,7 +69,7 @@ class MainActivity : AppCompatActivity() {
         binding.settingsFab.setOnClickListener { openSettings() }
 
         if (hasCameraPermission()) {
-            startWithDiscovery()
+            beginAppFlow()
         } else {
             cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
         }
@@ -76,6 +79,18 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         binding.webView.onResume()
         enterImmersiveMode()
+        if (waitingForWifi) {
+            if (NetworkHelper.isWifiConnected(this)) {
+                waitingForWifi = false
+                if (hasCameraPermission()) {
+                    startWithDiscovery()
+                }
+            } else {
+                showWifiWaitingUi()
+                promptOpenWifiSettings(force = true)
+            }
+            return
+        }
         ensureNativeRunning()
     }
 
@@ -214,6 +229,44 @@ class MainActivity : AppCompatActivity() {
         ensureNativeRunning()
     }
 
+    private fun beginAppFlow() {
+        if (!hasCameraPermission()) {
+            cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+            return
+        }
+        if (!ensureWifiConnected()) return
+        startWithDiscovery()
+    }
+
+    private fun ensureWifiConnected(): Boolean {
+        if (NetworkHelper.isWifiConnected(this)) {
+            waitingForWifi = false
+            return true
+        }
+        waitingForWifi = true
+        showWifiWaitingUi()
+        Toast.makeText(this, R.string.wifi_connect_required, Toast.LENGTH_LONG).show()
+        promptOpenWifiSettings(force = false)
+        return false
+    }
+
+    private fun showWifiWaitingUi() {
+        binding.loadingOverlay.visibility = View.VISIBLE
+        binding.loadingMessage.visibility = View.VISIBLE
+        binding.loadingMessage.setText(R.string.wifi_still_disconnected)
+    }
+
+    private fun promptOpenWifiSettings(force: Boolean) {
+        val now = System.currentTimeMillis()
+        if (!force && now - lastWifiSettingsLaunchMs < 1_500) return
+        lastWifiSettingsLaunchMs = now
+        try {
+            startActivity(Intent(Settings.ACTION_WIFI_SETTINGS))
+        } catch (_: Exception) {
+            NetworkHelper.openWifiSettings(this)
+        }
+    }
+
     private fun startWithDiscovery() {
         binding.loadingOverlay.visibility = View.VISIBLE
         Thread {
@@ -230,11 +283,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun retryDiscovery() {
+        if (!ensureWifiConnected()) return
         binding.loadingOverlay.visibility = View.VISIBLE
         runDiscovery()
     }
 
     private fun runDiscovery() {
+        if (!NetworkHelper.isWifiConnected(this)) {
+            ensureWifiConnected()
+            return
+        }
         binding.loadingMessage.visibility = View.VISIBLE
         ServerDiscovery.discover { result ->
             runOnUiThread {

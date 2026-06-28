@@ -1,8 +1,10 @@
 package com.nameface.rokid
 
 import android.content.Context
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.Inet4Address
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.URL
 import java.security.SecureRandom
@@ -18,12 +20,15 @@ import javax.net.ssl.X509TrustManager
 
 object ServerDiscovery {
 
+    /** Must match backend `service_id` and frontend `nameface-discovery.json`. */
+    private const val NAMEFACE_SERVICE_ID = "nameface-ai"
     private const val BACKEND_PORT = 8000
     private const val TCP_RECOGNIZE_PORT = Prefs.DEFAULT_TCP_RECOGNIZE_PORT
     private const val FRONTEND_PORT_HTTPS = 5173
     private const val FRONTEND_PORT_HTTP = 5174
     private const val CONNECT_TIMEOUT_MS = 1200
     private const val READ_TIMEOUT_MS = 1200
+    private val TCP_PROBE_MAGIC = byteArrayOf(0x4E, 0x46, 0x50, 0x01) // NFP\x01
 
     data class Result(
         val frontendHost: String,
@@ -39,7 +44,7 @@ object ServerDiscovery {
 
     fun verifySaved(context: Context): Boolean {
         val backendIp = Prefs.getBackendIp(context)
-        if (!probeBackend(backendIp)) return false
+        if (!probeBackendDiscovery(backendIp)) return false
         if (!probeFrontendHost(Prefs.getFrontendHost(context), Prefs.useHttps(context))) return false
         if (DeviceProfile.useNativeCamera() && !probeTcp(backendIp)) return false
         return true
@@ -68,7 +73,7 @@ object ServerDiscovery {
         for (ip in buildIpCandidates(prefix, localIp)) {
             executor.submit {
                 if (found.get() != null) return@submit
-                if (!probeBackend(ip)) return@submit
+                if (!probeBackendDiscovery(ip)) return@submit
                 if (requireTcp && !probeTcp(ip)) return@submit
                 found.compareAndSet(null, ip)
             }
@@ -99,15 +104,15 @@ object ServerDiscovery {
         return found.get()
     }
 
-    /** 优先 HTTPS 5173：WebView 仅在安全上下文中提供摄像头 */
+    /** Prefer HTTPS 5173: WebView only exposes camera in a secure context. */
     private fun probeFrontendOnIp(ip: String): Pair<Int, Boolean>? {
-        if (probeFrontendUrl("https://$ip:$FRONTEND_PORT_HTTPS/rokid", https = true)) {
+        if (probeFrontendDiscovery(ip, FRONTEND_PORT_HTTPS, https = true)) {
             return FRONTEND_PORT_HTTPS to true
         }
-        if (probeFrontendUrl("http://$ip:$FRONTEND_PORT_HTTP/rokid", https = false)) {
+        if (probeFrontendDiscovery(ip, FRONTEND_PORT_HTTP, https = false)) {
             return FRONTEND_PORT_HTTP to false
         }
-        if (probeFrontendUrl("http://$ip:$FRONTEND_PORT_HTTPS/rokid", https = false)) {
+        if (probeFrontendDiscovery(ip, FRONTEND_PORT_HTTPS, https = false)) {
             return FRONTEND_PORT_HTTPS to false
         }
         return null
@@ -117,11 +122,7 @@ object ServerDiscovery {
         val ip = host.substringBefore(':')
         val port = host.substringAfter(':', FRONTEND_PORT_HTTPS.toString()).toIntOrNull()
             ?: FRONTEND_PORT_HTTPS
-        if (useHttps) {
-            return probeFrontendUrl("https://$ip:$port/rokid", https = true)
-        }
-        return probeFrontendUrl("http://$ip:$port/rokid", https = false) ||
-            probeFrontendUrl("http://$ip:$FRONTEND_PORT_HTTP/rokid", https = false)
+        return probeFrontendDiscovery(ip, port, useHttps)
     }
 
     private fun buildIpCandidates(prefix: String, priorityIp: String): List<String> {
@@ -153,14 +154,30 @@ object ServerDiscovery {
         return result
     }
 
-    private fun probeBackend(ip: String): Boolean {
+    private fun probeBackendDiscovery(ip: String): Boolean {
         return try {
-            val conn = openHttp("http://$ip:$BACKEND_PORT/api/health")
+            val conn = openHttp("http://$ip:$BACKEND_PORT/api/discovery")
             conn.requestMethod = "GET"
             if (conn.responseCode != HttpURLConnection.HTTP_OK) return false
             val body = conn.inputStream.bufferedReader().use { it.readText() }
-            body.contains("\"status\"") &&
-                (body.contains("model_loaded") || body.contains("\"ok\""))
+            parseServiceId(body) == NAMEFACE_SERVICE_ID
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun probeFrontendDiscovery(ip: String, port: Int, https: Boolean): Boolean {
+        val scheme = if (https) "https" else "http"
+        return try {
+            val conn = if (https) {
+                openHttps("$scheme://$ip:$port/nameface-discovery.json")
+            } else {
+                openHttp("$scheme://$ip:$port/nameface-discovery.json")
+            }
+            conn.requestMethod = "GET"
+            if (conn.responseCode != HttpURLConnection.HTTP_OK) return false
+            val body = conn.inputStream.bufferedReader().use { it.readText() }
+            parseServiceId(body) == NAMEFACE_SERVICE_ID
         } catch (_: Exception) {
             false
         }
@@ -169,26 +186,42 @@ object ServerDiscovery {
     private fun probeTcp(ip: String): Boolean {
         return try {
             java.net.Socket().use { socket ->
-                socket.connect(java.net.InetSocketAddress(ip, TCP_RECOGNIZE_PORT), CONNECT_TIMEOUT_MS)
+                socket.connect(InetSocketAddress(ip, TCP_RECOGNIZE_PORT), CONNECT_TIMEOUT_MS)
+                socket.soTimeout = READ_TIMEOUT_MS
+                socket.getOutputStream().use { out ->
+                    out.write(TCP_PROBE_MAGIC)
+                    out.flush()
+                }
+                val lenBuf = ByteArray(4)
+                if (!readExact(socket.getInputStream(), lenBuf)) return false
+                val length = java.nio.ByteBuffer.wrap(lenBuf).int
+                if (length < 1 || length > 4096) return false
+                val payload = ByteArray(length)
+                if (!readExact(socket.getInputStream(), payload)) return false
+                parseServiceId(String(payload, Charsets.UTF_8)) == NAMEFACE_SERVICE_ID
             }
-            true
         } catch (_: Exception) {
             false
         }
     }
 
-    private fun probeFrontendUrl(urlString: String, https: Boolean): Boolean {
+    private fun parseServiceId(body: String): String? {
         return try {
-            val conn = if (https) openHttps(urlString) else openHttp(urlString)
-            conn.requestMethod = "GET"
-            if (conn.responseCode != HttpURLConnection.HTTP_OK) return false
-            val body = conn.inputStream.bufferedReader().use { it.readText().take(4096) }
-            body.contains("rokid", ignoreCase = true) ||
-                body.contains("NameFace", ignoreCase = true) ||
-                body.contains("<!doctype html", ignoreCase = true)
+            val id = JSONObject(body.trim()).optString("service_id", "")
+            id.ifBlank { null }
         } catch (_: Exception) {
-            false
+            null
         }
+    }
+
+    private fun readExact(input: java.io.InputStream, buffer: ByteArray): Boolean {
+        var offset = 0
+        while (offset < buffer.size) {
+            val read = input.read(buffer, offset, buffer.size - offset)
+            if (read < 0) return false
+            offset += read
+        }
+        return true
     }
 
     private fun openHttp(urlString: String): HttpURLConnection {

@@ -15,6 +15,8 @@
     <string name="discover_success">已找到：%1$s</string>
     <string name="discover_failed">未找到服务器，请检查 WiFi 与电脑是否已启动 NameFaceAI</string>
     <string name="discover_no_network">未连接 WiFi，无法自动搜索</string>
+    <string name="wifi_connect_required">请先连接 WiFi，已打开系统 WiFi 设置</string>
+    <string name="wifi_still_disconnected">仍未连接 WiFi，请连接后返回应用</string>
     <string name="page_load_failed">页面加载失败，正在重新搜索服务器…</string>
     <string name="camera_permission_denied">需要摄像头权限才能识别人脸</string>
     <string name="stream_notification_channel">画面推流</string>

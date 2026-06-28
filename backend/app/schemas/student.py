@@ -58,6 +58,7 @@ class RecognizeResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
+    service_id: str = "nameface-ai"
     gpu: bool
     accelerator: str  # gpu | igpu | cpu
     accelerator_label: str

@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     name_tag_roi_width_ratio: float = 1.2
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
     tcp_recognize_port: int = 8001
+    service_id: str = "nameface-ai"
 
     llm_provider: str = ""
     openai_api_key: str = ""
