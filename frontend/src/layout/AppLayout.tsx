@@ -3,6 +3,7 @@ import FaceRetouchingNaturalIcon from "@mui/icons-material/FaceRetouchingNatural
 import GroupsIcon from "@mui/icons-material/Groups";
 import MonitorIcon from "@mui/icons-material/Monitor";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import QuizIcon from "@mui/icons-material/Quiz";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import {
@@ -30,6 +31,7 @@ const iconMap = {
   person_add: PersonAddIcon,
   groups: GroupsIcon,
   attendance: EventNoteIcon,
+  quiz: QuizIcon,
   smart_toy: SmartToyIcon,
   monitor: MonitorIcon,
   rokid: ViewInArIcon,

@@ -26,6 +26,7 @@ export const en: TranslationDict = {
     enroll: "Enroll student",
     students: "Students",
     attendance: "Attendance",
+    practice: "Name practice",
     assistant: "AI assistant",
     rokidPreview: "Rokid preview",
     rokid: "Rokid glasses",
@@ -155,6 +156,10 @@ export const en: TranslationDict = {
     resetStats: "Reset stats",
     description:
       "Live feed and recognition boxes from the glasses. Start NameFaceAI recognition on the device first.",
+    descriptionWithRotate:
+      "Live feed and recognition boxes from the glasses. Use Rotate if the image orientation is wrong; your choice is saved.",
+    rotate: "Rotate {{deg}}°",
+    rotationLabel: "Rotation {{deg}}°",
     waitingFrame: "Connected — waiting for frames from glasses…",
     notConnected: "Preview service not connected. Check that the backend is running.",
     previewAlt: "Rokid preview",

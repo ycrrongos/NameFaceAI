@@ -91,6 +91,7 @@ export const navItems = [
   { path: "/enroll", labelKey: "nav.enroll", icon: "person_add" as const },
   { path: "/students", labelKey: "nav.students", icon: "groups" as const },
   { path: "/attendance", labelKey: "nav.attendance", icon: "attendance" as const },
+  { path: "/practice", labelKey: "nav.practice", icon: "quiz" as const },
   { path: "/assistant", labelKey: "nav.assistant", icon: "smart_toy" as const },
   { path: "/rokid-preview", labelKey: "nav.rokidPreview", icon: "monitor" as const },
   { path: "/rokid", labelKey: "nav.rokid", icon: "rokid" as const },

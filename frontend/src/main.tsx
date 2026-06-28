@@ -15,6 +15,7 @@ import { AssistantPage } from "./pages/AssistantPage.tsx";
 import { AttendancePage } from "./pages/AttendancePage.tsx";
 import { EnrollPage } from "./pages/EnrollPage.tsx";
 import { GlassesPage } from "./pages/GlassesPage.tsx";
+import { PracticePage } from "./pages/PracticePage.tsx";
 import { RecognizePage } from "./pages/RecognizePage.tsx";
 import { RokidPreviewPage } from "./pages/RokidPreviewPage.tsx";
 import { StudentsPage } from "./pages/StudentsPage.tsx";
@@ -36,6 +37,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/enroll" element={<EnrollPage />} />
             <Route path="/students" element={<StudentsPage />} />
             <Route path="/attendance" element={<AttendancePage />} />
+            <Route path="/practice" element={<PracticePage />} />
             <Route path="/assistant" element={<AssistantPage />} />
             <Route path="/rokid-preview" element={<RokidPreviewPage />} />
           </Route>

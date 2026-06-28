@@ -312,3 +312,53 @@ html.rokid-webview .glasses-page__error-bar {
   color: #ffaaaa;
   text-align: center;
 }
+
+.glasses-page__center-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.glasses-page__reticle-wrap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  transform: translate(-50%, -50%);
+}
+
+.glasses-page__reticle {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border: 2px solid rgba(57, 255, 20, 0.75);
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(57, 255, 20, 0.45);
+  pointer-events: none;
+}
+
+.glasses-page__center-name {
+  position: relative;
+  width: max-content;
+  max-width: 92vw;
+  font-size: clamp(2.75rem, 14vw, 5rem);
+  font-weight: 700;
+  line-height: 1.05;
+  color: #39ff14;
+  text-shadow:
+    0 0 24px rgba(57, 255, 20, 0.75),
+    0 2px 8px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.glasses-page__center-name--unknown {
+  color: #ff6666;
+  text-shadow:
+    0 0 20px rgba(255, 68, 68, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.9);
+}

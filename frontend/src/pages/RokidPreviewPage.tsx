@@ -1,5 +1,6 @@
 import MonitorIcon from "@mui/icons-material/Monitor";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import RotateRightIcon from "@mui/icons-material/RotateRight";
 import {
   Alert,
   Box,
@@ -10,51 +11,30 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useEffect, useRef } from "react";
-import type { FaceMatch } from "../api/client";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRokidPreview } from "../hooks/useRokidPreview";
 import { useI18n } from "../i18n/I18nProvider";
-import { mapFaceBboxToOverlay } from "../utils/cameraUtils";
+import {
+  drawRokidPreviewFrame,
+  nextPreviewRotation,
+  previewContentSize,
+  type PreviewRotation,
+  ROKID_PREVIEW_ROTATIONS,
+} from "../utils/rokidPreviewUtils";
 
-function drawOverlay(
-  canvas: HTMLCanvasElement,
-  img: HTMLImageElement,
-  faces: FaceMatch[],
-  unknownLabel: string,
-) {
-  const w = img.naturalWidth;
-  const h = img.naturalHeight;
-  if (w < 1 || h < 1) return;
+const ROTATION_STORAGE_KEY = "rokid-preview-rotation";
 
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  ctx.clearRect(0, 0, w, h);
-  for (const face of faces) {
-    const { left, top, width, height } = mapFaceBboxToOverlay(
-      face.bbox,
-      w,
-      h,
-      w,
-      h,
-      { objectFit: "fill", mirrored: false },
-    );
-    const known = face.name !== "未知";
-
-    ctx.strokeStyle = known ? "#39FF14" : "#FF4444";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(left, top, width, height);
-
-    const label = known ? face.name : unknownLabel;
-    ctx.font = "700 20px 'Noto Sans SC', sans-serif";
-    const tw = ctx.measureText(label).width + 16;
-    ctx.fillStyle = known ? "rgba(57,255,20,0.9)" : "rgba(255,68,68,0.9)";
-    ctx.fillRect(left, top - 30, tw, 28);
-    ctx.fillStyle = known ? "#000" : "#fff";
-    ctx.fillText(label, left + 8, top - 10);
+function loadSavedRotation(): PreviewRotation {
+  try {
+    const raw = localStorage.getItem(ROTATION_STORAGE_KEY);
+    const n = Number(raw);
+    if (ROKID_PREVIEW_ROTATIONS.includes(n as PreviewRotation)) {
+      return n as PreviewRotation;
+    }
+  } catch {
+    /* ignore */
   }
+  return 0;
 }
 
 export function RokidPreviewPage() {
@@ -62,31 +42,69 @@ export function RokidPreviewPage() {
   const { connected, preview, error, frameCount, stale, resetStats } = useRokidPreview(true);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const unknownLabel = faceName("未知");
+  const [rotationCW, setRotationCW] = useState<PreviewRotation>(loadSavedRotation);
 
-  useEffect(() => {
+  const redraw = useCallback(() => {
     const img = imgRef.current;
     const canvas = canvasRef.current;
     if (!img || !canvas || !preview) return;
+    if (img.naturalWidth < 1) return;
+    drawRokidPreviewFrame(canvas, img, preview.faces, rotationCW, faceName("未知"));
+  }, [preview, rotationCW, faceName]);
+
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img || !preview) return;
 
     if (img.complete && img.naturalWidth > 0) {
-      drawOverlay(canvas, img, preview.faces, unknownLabel);
+      redraw();
       return;
     }
 
-    const onLoad = () => drawOverlay(canvas, img, preview.faces, unknownLabel);
+    const onLoad = () => redraw();
     img.addEventListener("load", onLoad);
     return () => img.removeEventListener("load", onLoad);
-  }, [preview, unknownLabel]);
+  }, [preview, redraw]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const observer = new ResizeObserver(() => redraw());
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [redraw]);
+
+  const rotatePreview = () => {
+    setRotationCW((current) => {
+      const next = nextPreviewRotation(current);
+      try {
+        localStorage.setItem(ROTATION_STORAGE_KEY, String(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   const fps =
     preview?.frameIntervalMs != null && preview.frameIntervalMs > 0
       ? (1000 / preview.frameIntervalMs).toFixed(1)
       : "—";
 
+  const previewAspect = preview
+    ? (() => {
+        const { contentW, contentH } = previewContentSize(
+          preview.width || 16,
+          preview.height || 9,
+          rotationCW,
+        );
+        return `${contentW}/${contentH}`;
+      })()
+    : "9/16";
+
   return (
     <Stack spacing={2}>
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
         <MonitorIcon color="primary" />
         <Typography variant="h6" sx={{ flex: 1 }}>
           {t("rokidPreview.title")}
@@ -96,13 +114,16 @@ export function RokidPreviewPage() {
           label={connected ? t("rokidPreview.connected") : t("rokidPreview.disconnected")}
           color={connected ? "success" : "default"}
         />
+        <Button size="small" startIcon={<RotateRightIcon />} onClick={rotatePreview}>
+          {t("rokidPreview.rotate", { deg: rotationCW })}
+        </Button>
         <Button size="small" startIcon={<RefreshIcon />} onClick={resetStats}>
           {t("rokidPreview.resetStats")}
         </Button>
       </Stack>
 
       <Typography variant="body2" color="text.secondary">
-        {t("rokidPreview.description")}
+        {t("rokidPreview.descriptionWithRotate")}
       </Typography>
 
       {error && <Alert severity="error">{error}</Alert>}
@@ -120,33 +141,34 @@ export function RokidPreviewPage() {
           sx={{
             position: "relative",
             bgcolor: "#111",
-            minHeight: 280,
+            minHeight: 320,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
           {preview ? (
-            <Box sx={{ position: "relative", maxWidth: "100%", lineHeight: 0 }}>
+            <>
               <Box
                 component="img"
                 ref={imgRef}
                 src={preview.imageUrl}
-                alt={t("rokidPreview.previewAlt")}
-                sx={{ maxWidth: "100%", maxHeight: 480, display: "block" }}
+                alt=""
+                aria-hidden
+                sx={{ display: "none" }}
               />
               <Box
                 component="canvas"
                 ref={canvasRef}
                 sx={{
-                  position: "absolute",
-                  inset: 0,
                   width: "100%",
-                  height: "100%",
-                  pointerEvents: "none",
+                  maxWidth: 480,
+                  aspectRatio: previewAspect,
+                  maxHeight: 560,
+                  display: "block",
                 }}
               />
-            </Box>
+            </>
           ) : (
             <Typography color="text.secondary">{t("rokidPreview.noFrame")}</Typography>
           )}
@@ -154,6 +176,7 @@ export function RokidPreviewPage() {
 
         <CardContent>
           <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
+            <Chip label={t("rokidPreview.rotationLabel", { deg: rotationCW })} variant="outlined" />
             <Chip label={t("rokidPreview.inferenceMs", { ms: preview ? preview.inferenceMs.toFixed(0) : "—" })} />
             <Chip label={t("rokidPreview.processMs", { ms: preview ? preview.totalMs.toFixed(0) : "—" })} />
             <Chip label={t("rokidPreview.frameInterval", { ms: preview?.frameIntervalMs?.toFixed(0) ?? "—" })} />

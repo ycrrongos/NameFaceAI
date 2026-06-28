@@ -24,6 +24,7 @@ export const zh = {
     enroll: "录入学生",
     students: "学生管理",
     attendance: "考勤表",
+    practice: "记名练习",
     assistant: "AI 助手",
     rokidPreview: "Rokid 预览",
     rokid: "Rokid 眼镜",
@@ -151,6 +152,10 @@ export const zh = {
     disconnected: "未连接",
     resetStats: "重置统计",
     description: "实时显示眼镜端上传的画面与识别框，用于观察延迟。请先在眼镜上开启 NameFaceAI 识别。",
+    descriptionWithRotate:
+      "实时显示眼镜端上传的画面与识别框。若画面方向不对，点「旋转」调整；设置会自动保存。",
+    rotate: "旋转 {{deg}}°",
+    rotationLabel: "旋转 {{deg}}°",
     waitingFrame: "已连接，等待眼镜端发送画面…",
     notConnected: "未连接到预览服务，请确认后端已启动。",
     previewAlt: "Rokid 预览",
